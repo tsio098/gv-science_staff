@@ -442,27 +442,60 @@ body {
 .gv-print-btn:hover { background: var(--c-bg-warm); color: var(--c-text); }
 
 /* ════════════════════════════════════════════════════════
-   印刷 / PDF出力（B4）。操作系UIを隠し、レポートとして整形。
-   @page の用紙サイズ・向きは printB4() が動的に注入。
+   印刷 / PDF出力（B4・横）— 4要素を1枚に収めるレポート整形。
+   残す: 欠席率ピル / 模試の成績表 / 合計点グラフ / 分野別グラフ
+   隠す: 操作UI・長い一覧（テスト記録/分野月次）・注記
+   用紙/向きは onPrintPDF() が @page を注入（既定値もここで指定）。
    ════════════════════════════════════════════════════════ */
+@page { size: B4 landscape; margin: 7mm; }
 @media print {
-  /* 操作・ナビ系を隠す */
+  /* 操作系・ナビ・長い一覧・注記を隠す */
   .tw-header, .tw-detail-topbar, .gv-print-bar, .tw-back,
   .gt-vchips, .gt-presets, .gt-range, .gt-fieldchips,
-  .gt-seg, .tw-subjtabs, .gt-gapnote { display: none !important; }
+  .gt-seg, .tw-subjtabs, .gt-gapnote, .gt-note, .gt-note-soft,
+  .gt-tests, .gt-fd, .tw-subject-eyebrow { display: none !important; }
 
   html, body, .gv-root, .tw-frame, .tw-main, .tw-detail { background: #fff !important; }
   .tw-frame { padding: 0 !important; }
-  .tw-main.tw-detail { max-width: none !important; padding: 0 !important; }
+  .tw-main.tw-detail { max-width: none !important; padding: 0 !important; font-size: 10px; }
 
-  /* カードは途中で切らない／影は消す */
-  .gt-card, .mk-card, .tw-subject-section { break-inside: avoid; page-break-inside: avoid; box-shadow: none !important; }
-  .gt-card { margin-bottom: 6mm !important; border: 0.5px solid var(--c-divider) !important; }
+  /* ヘッダー（氏名・担任・志望校・欠席率ピル）をコンパクトに */
+  .tw-detail-head { margin-bottom: 4mm !important; }
+  .tw-detail-title { font-size: 18px !important; }
+  .tw-att-mini-row { gap: 5px !important; }
+  .tw-att-pill { width: auto !important; padding: 4px 9px !important; }
 
-  /* スクロール領域は全部見せる */
-  .gt-scroll { max-height: none !important; overflow: visible !important; }
+  /* 模試の成績表：全幅・小さめフォントで収める */
+  .mk-card { margin: 0 0 4mm !important; padding: 8px 10px !important; break-inside: avoid; box-shadow: none !important; }
   .mk-tablewrap { overflow: visible !important; }
-  .tw-detail-grid { display: block !important; }
+  .mk-table { font-size: 8px !important; }
+  .mk-table th, .mk-table td { padding: 2px 4px !important; }
+  .mk-subj { max-width: 70px !important; }
+
+  /* 科目セクション：枠線/余白を削り、合計点(左・狭め)＋分野別(右・広め)を横並びに。
+     分野別を広めにして、得点傾向の2カラム（得意/苦手）が折り返さない幅を確保する。 */
+  .tw-subject-section { border-top: none !important; margin: 0 !important; padding: 0 !important; }
+  .tw-detail-grid { display: grid !important; grid-template-columns: 0.82fr 1.18fr !important; gap: 6mm !important; align-items: start !important; }
+  .gt-card { margin: 0 !important; padding: 8px 11px !important; box-shadow: none !important;
+             border: 0.5px solid var(--c-divider) !important; break-inside: avoid; }
+  .gt-card-title { font-size: 13px !important; }
+  .gt-summary { margin: 4px 0 8px !important; }
+  .gt-legend { margin-top: 4px !important; font-size: 9px !important; }
+
+  /* グラフは列幅に合わせて自動縮尺 */
+  .gt-chart { height: auto !important; width: 100% !important; }
+
+  /* 分野別＝得点傾向（得意/苦手）。Webデザイン（背景バー・2カラム）を踏襲しつつ少し詰める。 */
+  .tw-sw-grid { grid-template-columns: 1fr 1fr !important; gap: 12px !important; }
+  .gt-sw-h { font-size: 11px !important; margin-bottom: 5px !important; }
+  .gt-sw-badge { font-size: 10px !important; padding: 1px 7px !important; }
+  .gt-sw-row { padding: 5px 9px !important; margin-bottom: 4px !important; border-radius: 9px !important; }
+  .gt-sw-name { font-size: 11px !important; }
+  .gt-sw-v { font-size: 11.5px !important; }
+  .gt-sw-d { font-size: 10px !important; width: 30px !important; }
+
+  /* 念のためスクロール領域は展開 */
+  .gt-scroll { max-height: none !important; overflow: visible !important; }
 
   /* 印刷で色を保持 */
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }

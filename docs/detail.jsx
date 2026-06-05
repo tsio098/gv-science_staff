@@ -215,16 +215,6 @@ function MockExamCard({ det }) {
 
 }
 
-// 詳細画面を B4（縦/横）でPDF化。ブラウザの印刷ダイアログで「PDFに保存」を選ぶ。
-function printB4(orientation) {
-  const land = orientation === 'landscape';
-  let st = document.getElementById('gv-print-page');
-  if (!st) { st = document.createElement('style'); st.id = 'gv-print-page'; document.head.appendChild(st); }
-  st.textContent = '@page { size: B4 ' + (land ? 'landscape' : 'portrait') + '; margin: 8mm; }';
-  document.documentElement.setAttribute('data-print-orient', land ? 'landscape' : 'portrait');
-  setTimeout(() => window.print(), 40);
-}
-
 function StudentDetailScreen({ nav, name, state = 'normal' }) {
   const det = DETAIL[name];
   const subjects = det ? det.subjects : [];
@@ -255,6 +245,16 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
   const order = d.fields.filter((f) => sel.has(f));
   const fieldSeries = order.map((f) => ({ name: f, color: colorForField(det, subject, f), rate: d.rate[f], avgRate: d.avgRate[f], hensachi: d.hensachi[f] }));
   const toggleField = (f) => setSel((s) => {const n = new Set(s);n.has(f) ? n.delete(f) : n.add(f);return n;});
+
+  // PDF出力（B4 横）。分野別は「得点傾向（得点率）」表示に切り替えてから印刷する。
+  const onPrintPDF = () => {
+    setFv('strengths');
+    setMetric('rate');
+    let st = document.getElementById('gv-print-page');
+    if (!st) { st = document.createElement('style'); st.id = 'gv-print-page'; document.head.appendChild(st); }
+    st.textContent = '@page { size: B4 landscape; margin: 7mm; }';
+    setTimeout(() => window.print(), 220);
+  };
 
   // ── 得点傾向（得意/苦手）— 平均得点率は除外 ──
   const swMetricKey = metric === 'avgRate' ? 'rate' : metric;
@@ -308,8 +308,7 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
       <div className="tw-detail-topbar">
         <button className="tw-back" onClick={() => nav('back')}>{Icon.chevL(14)} 一覧へ戻る</button>
         <div className="gv-print-bar">
-          <button className="gv-print-btn" onClick={() => printB4('portrait')}>PDF（B4縦）</button>
-          <button className="gv-print-btn" onClick={() => printB4('landscape')}>PDF（B4横）</button>
+          <button className="gv-print-btn" onClick={onPrintPDF}>PDF出力（B4・横）</button>
         </div>
       </div>
       <div className="tw-detail-head">
