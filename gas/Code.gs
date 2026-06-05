@@ -1,0 +1,817 @@
+/***********************************************************************
+ * GV Science — 先生用 成績ダッシュボード  バックエンド（GAS Web App）
+ *
+ *  生徒向けアプリとは独立した「先生用」スタンドアロン GAS プロジェクトです。
+ *  GitHub Pages のフロント（docs/）から GET で呼ばれ、JSON を返します。
+ *
+ *  エンドポイント（すべて GET / クエリ token 必須）:
+ *    ?action=students&token=...            … 生徒一覧の軽量サマリー
+ *    ?action=scores&name=<生徒名>&token=... … 生徒1人の詳細（演習＋マーク模試）
+ *    （&fresh=1 でサーバキャッシュを無視して取り直す）
+ *
+ *  ── 設定（CONFIG）──────────────────────────────────────────────
+ *  下の CONFIG / 列マップを、実際のスプレッドシートに合わせて埋めてください。
+ *  ★印は必ず確認・修正が必要な箇所です。シート構成が CONFIG と一致していれば
+ *  コード本体の変更は不要です。
+ ***********************************************************************/
+
+/* ============================ CONFIG ============================ */
+var CONFIG = {
+  // 認証：false なら「URL を知っていれば誰でも閲覧可」（トークン不要）。
+  //   あとでトークン制限を掛けたくなったら true にし、ACCESS_TOKEN とフロント config.js の
+  //   AUTH_ENABLED / token を合わせるだけで有効化できます。
+  AUTH_ENABLED: false,
+  // 先生用の限定配布トークン（AUTH_ENABLED:true のときのみ使用）。
+  ACCESS_TOKEN: 'gv-2026-CHANGE-ME',
+
+  // スプレッドシートID（URL の /d/ と /edit の間の文字列）
+  SCORES_SPREADSHEET_ID: '1ILJjWsOjVog3rQDrtSQ4E1Hh6Vodd-wpfRdczxRlWYY', // 演習点数報告 2026（回答）
+  ROSTER_SPREADSHEET_ID: '1JuEYCeSnBhKCw1Q9jbhh9CCstStQOF6uOCQAkfZvyOU', // GV Science DB（生徒IDシート）
+  MOCK_SPREADSHEET_ID:   '1b9vzmfH76k6hrXJ0AWZnZVmvbQzYBE_LWCcfVa8q5ZY', // ☆試験成績報告（回答）
+
+  // 【将来用・未実装】授業欠席率シート。学年×使用科目でシートを絞り欠席率を取得する想定。
+  // ABSENCE_SPREADSHEET_ID: '10laMTBkDx6gafoMSbQr3ib1hSEt3G-NYTWTuX9iB7qw',
+
+  // 科目キー → 演習成績シート名。
+  //   化学 / 生物 は作成済み。基礎科目（化学基礎/生物基礎/地学基礎）は下記の名前で事前登録済みです。
+  //   そのタブがまだ無い間は自動でスキップされます（エラーにはなりません）。
+  //   タブを「A〜F=名前/テスト名/実施日/合計/平均/偏差値、以降 分野ごとに4列
+  //   （分野名 / 分野名 得点率 / 分野名 平均得点率 / 分野名 偏差値）」の並びで作れば、
+  //   分野名はヘッダーから自動検出されるため SCORES_FIELDS への追記は不要です。
+  SCORES_SHEETS: {
+    chemistry:    '化学 成績',
+    biology:      '生物 成績',
+    chem_basics:  '化学基礎 成績',
+    bio_basics:   '生物基礎 成績',
+    earth_basics: '地学基礎 成績',
+  },
+
+  // キャッシュ秒数
+  CACHE_STUDENTS_SEC: 30 * 60, // 一覧 30分
+  CACHE_DETAIL_SEC:   30 * 60, // 詳細 30分
+  CACHE_NODATA_SEC:   60,      // データ無しは短く
+
+  // 一覧の「要注目」判定
+  FLAG_DECLINING_DELTA: -3,    // 偏差値の前回比がこれ以下で「下降」
+  FLAG_STALE_DAYS:      30,    // 最終受験からこの日数以上で「長期未受験」
+};
+
+/* ── ★ 生徒IDシートの列マップ（1始まり）────────────────────────
+ *  README より「担任 = F列」。他列は実シートに合わせて調整してください。
+ *  SUBJECTS は「化学,生物」等を1セルに入れる想定（区切りは , 、 空白 / のいずれも可）。
+ *  科目を列ごとに分けている場合は readRoster_() の該当箇所を調整。      */
+var ROSTER = {
+  SHEET: '生徒ID',     // 実シート名（GV Science DB の先頭タブ）
+  HEADER_ROWS: 1,      // 見出し行数
+  // 実ヘッダー：A:名前 / B:USERID / C:学年 / D:ID / E:理科使用科目 / F:担任
+  COL: {
+    name:     1,       // 名前（A列）
+    grade:    3,       // 学年（C列）"既卒"/"高校3年生" 等
+    subjects: 5,       // 理科使用科目（E列）"化学,生物" 等。物理は成績シートが無いため自動で無視。
+    homeroom: 6,       // 担任（F列）
+  },
+  // E列がこれらの値（または空白）の生徒は一覧対象から除外（読み込み段階でスキップ）。
+  SKIP_SUBJECT_TOKENS: ['未回答', '未記入', 'なし', '使用しない', '-', '—'],
+};
+
+/* ── ★ マーク模試(フォーム)シートの列マップ（1始まり）─────────────
+ *  README より「生徒名 = F列」「志望校 = I列（時系列・最新を採用）」。
+ *  共通テスト各科目の素点列は実シートに合わせて必ず調整してください。
+ *  null を入れた項目は「その列が無い」とみなして '–'（未入力）扱いにします。   */
+var MOCK = {
+  SHEET: 'マーク模試(フォーム)', // 実シート名（☆試験成績報告（回答）の先頭タブ）
+  HEADER_ROWS: 1,
+  // 実ヘッダー（1始まり）：1 タイムスタンプ / 2 試験名 / 3 生徒ID / 4 姓 / 5 名 / 6 名前 /
+  //   7 合計 / 8 学年 / 9 志望校(旧) / 10 志望校(新) / 11 国現 / 12 国古 / 13 国漢 / 14 国合計 /
+  //   15 英R / 16 英L / 17 英合計 / 18 ⅠA / 19 ⅡBC /
+  //   20 理1名 21 理1点 / 22 理2名 23 理2点 / 24 理3名 25 理3点 /
+  //   26 社1名 27 社1点 / 28 社2名 29 社2点 / 30 情報
+  COL: {
+    timestamp: 1,   // タイムスタンプ（記入日に使用）
+    date:      null, // 記入日を別列で持つ場合はその列（null ならタイムスタンプを使用）
+    examName:  2,    // 試験名「今回受験した模試…」
+    studentName: 6, // 名前（F列）
+    aspiration:  9, // 志望校（旧フォーム列）
+    aspiration2: 10, // 志望校（新フォーム列）。9 が空なら 10 を採用。
+
+    // 国語
+    kokugo_gendai: 11, kokugo_koten: 12, kokugo_kanbun: 13,
+    // 英語（w=リーディング, l=リスニング）
+    eigo_w: 15, eigo_l: 16,
+    // 数学
+    math_ia: 18, math_iib: 19,
+    // 理科（科目名＋点。第一〜第三）
+    rika1_name: 20, rika1_score: 21,
+    rika2_name: 22, rika2_score: 23,
+    rika3_name: 24, rika3_score: 25,
+    // 社会（科目名＋点。第一・第二）
+    shakai1_name: 26, shakai1_score: 27,
+    shakai2_name: 28, shakai2_score: 29,
+    // 情報I
+    joho: 30,
+    // 合計点（列があれば優先、無ければ各素点から自動合算）
+    total: 7,
+  },
+  // 試験名列が無い場合の表示名
+  EXAM_NAME_FALLBACK: 'マーク模試',
+  // 「英数のみ」の校内模試を判定する試験名キーワード（含まれれば full=false）
+  PARTIAL_KEYWORDS: ['GV模試', 'GV 模試', '英数'],
+  NOT_TAKEN: '受験していない',
+};
+
+/* 科目ラベル → キー（履修科目セルの表記ゆれを吸収）*/
+var SUBJECT_LABEL_TO_KEY = {
+  '化学': 'chemistry', '生物': 'biology',
+  '化学基礎': 'chem_basics', '生物基礎': 'bio_basics', '地学基礎': 'earth_basics',
+  'chemistry': 'chemistry', 'biology': 'biology',
+  'chem_basics': 'chem_basics', 'bio_basics': 'bio_basics', 'earth_basics': 'earth_basics',
+};
+var SUBJECT_ORDER = ['chemistry', 'biology', 'chem_basics', 'bio_basics', 'earth_basics'];
+
+/* ── 授業欠席率（学年×科目でタブを絞り、事前計算済みの「欠席率」を取得）────────
+ *  欠席率スプレッドシートは「<学年> <科目>」名のタブ（例：「既卒 化学」「H3 化学基礎」）に分かれ、
+ *  各タブ 1行目に「生徒名」「欠席率」列を含む（欠席率は % の数値が既に入っている）。
+ *  ※ ENABLED:false にすると一切読みに行きません（欠席率列は null になります）。       */
+var ABSENCE = {
+  ENABLED: true,
+  SPREADSHEET_ID: '10laMTBkDx6gafoMSbQr3ib1hSEt3G-NYTWTuX9iB7qw',
+  // タブ名は「<学年トークン> <科目ラベル>」。名簿の学年表記 → タブの学年トークンへ正規化。
+  GRADE_ALIAS: {
+    '既卒': '既卒',
+    'H3': 'H3', '高3': 'H3', '高校3年生': 'H3',
+    'H2': 'H2', '高2': 'H2', '高校2年生': 'H2',
+    'H1': 'H1', '高1': 'H1', '高校1年生': 'H1',
+  },
+  // 科目キー → タブ名に使う科目ラベル
+  SUBJECT_LABEL: { chemistry: '化学', biology: '生物', chem_basics: '化学基礎', bio_basics: '生物基礎', earth_basics: '地学基礎' },
+  STUDENT_HEADER: '生徒名',
+  RATE_HEADER: '欠席率',
+};
+
+/* 各科目の分野（順序固定）。演習シートの分野列を特定するために使用。
+ * ヘッダー（「分野名 得点率」等）で照合し、見つからなければこの順で固定オフセット。*/
+var SCORES_FIELDS = {
+  // 実シート「化学 成績」「生物 成績」のヘッダー（<分野名> 得点率 等）に厳密一致させています。
+  chemistry: ['物質','原子の構造','化学結合と結晶','物質量と濃度','酸塩基と中和','酸化還元反応','電池と電気分解','物質の三態','気体の性質','溶液の性質','熱化学','反応速度','化学平衡','非金属','典型金属','遷移金属','脂肪族化合物','芳香族化合物','天然高分子','合成高分子'],
+  biology: ['生物の進化','遺伝','系統と分類','細胞と分子','代謝','遺伝情報の発現','発生','遺伝子技術','動物の環境応答','植物の環境応答','生態系'],
+  // 基礎科目は成績シート未作成。空にしておくと、シート作成後にヘッダー「<分野名> 得点率」から
+  // 分野を自動検出します（明示したい場合はここに配列で列挙してください）。
+  chem_basics: [],
+  bio_basics: [],
+  earth_basics: [],
+};
+
+var TZ = Session.getScriptTimeZone() || 'Asia/Tokyo';
+
+/* ============================ ROUTER ============================ */
+function doGet(e) {
+  var p = (e && e.parameter) || {};
+  try {
+    if (CONFIG.AUTH_ENABLED && p.token !== CONFIG.ACCESS_TOKEN) return json_({ error: 'UNAUTHORIZED' });
+    var action = p.action || 'students';
+    var fresh = p.fresh === '1' || p.fresh === 'true';
+
+    if (action === 'students') return json_(getStudents_(fresh));
+    if (action === 'scores') {
+      if (!p.name) return json_({ error: 'NO_DATA' });
+      return json_(getDetail_(p.name, fresh));
+    }
+    return json_({ error: 'BAD_ACTION' });
+  } catch (err) {
+    return json_({ error: 'SERVER_ERROR', message: String(err && err.message || err) });
+  }
+}
+
+function json_(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/* ===================== STUDENTS (一覧サマリー) ===================== */
+function getStudents_(fresh) {
+  var cache = CacheService.getScriptCache();
+  var ckey = 'students';
+  if (!fresh) {
+    var hit = cache.get(ckey);
+    if (hit) { try { return JSON.parse(hit); } catch (e) {} }
+  }
+
+  var roster = readRoster_();                 // [{name,grade,subjects[],homeroom}]
+  if (!roster.length) return cacheNoData_(cache, ckey, { error: 'NO_DATA' });
+
+  // 履修されている科目だけ、演習成績シートを1回ずつ読み name→[{date,total,avg,hensachi}] に索引化
+  var usedSubjects = {};
+  roster.forEach(function (r) { r.subjects.forEach(function (s) { usedSubjects[s] = true; }); });
+  var index = {};                              // subjectKey -> { name -> rows[] }
+  Object.keys(usedSubjects).forEach(function (s) { index[s] = readSubjectTotalsByName_(s); });
+
+  // 欠席率：学年×科目タブを1回ずつ読み normName→% に索引化
+  var absIndex = {};                           // "gradeToken|subjectKey" -> { name -> rate }
+  if (ABSENCE.ENABLED) {
+    roster.forEach(function (r) {
+      var g = absGradeToken_(r.grade);
+      r.subjects.forEach(function (s) {
+        var k = g + '|' + s;
+        if (!(k in absIndex)) absIndex[k] = readAbsenceMap_(g, s);
+      });
+    });
+  }
+
+  var today = new Date();
+  var students = roster.map(function (r) {
+    var perSubject = {};
+    var lastExam = null, worstDelta = 0;
+    r.subjects.forEach(function (s) {
+      var rows = (index[s] && index[s][normName_(r.name)]) || [];
+      rows.sort(byDateAsc_);
+      if (!rows.length) return;
+      var last = rows[rows.length - 1], prev = rows[rows.length - 2];
+      var dHen = prev ? round1_(last.hensachi - prev.hensachi) : 0;
+      var dTot = prev ? (last.total - prev.total) : 0;
+      var am = absIndex[absGradeToken_(r.grade) + '|' + s];
+      var abVal = am ? am[normName_(r.name)] : undefined;
+      perSubject[s] = {
+        lastHensachi: last.hensachi,
+        deltaHensachi: dHen,
+        lastTotal: last.total,
+        deltaTotal: dTot,
+        lastDate: last.date,
+        spark: rows.map(function (x) { return x.total; }),
+        n: rows.length,
+        absence: (abVal == null ? null : abVal),
+      };
+      var d = parseDate_(last.date);
+      if (d && (!lastExam || d > lastExam)) lastExam = d;
+      if (dHen < worstDelta) worstDelta = dHen;
+    });
+
+    // 集計対象の科目（成績が実在するものだけ）
+    var subjects = r.subjects.filter(function (s) { return perSubject[s]; });
+    var daysSince = lastExam ? Math.round((today - lastExam) / 86400000) : null;
+
+    return {
+      name: r.name, grade: r.grade, homeroom: r.homeroom,
+      subjects: subjects,
+      perSubject: perSubject,
+      aspiration: null,           // 一覧では未使用（重いマーク模試読込を省く）
+      mockLatest: null,
+      lastExamDate: lastExam ? fmtDate_(lastExam) : null,
+      daysSince: daysSince,
+      flags: {
+        declining: worstDelta <= CONFIG.FLAG_DECLINING_DELTA,
+        stale: daysSince != null && daysSince >= CONFIG.FLAG_STALE_DAYS,
+      },
+      worstDelta: worstDelta,
+    };
+  }).filter(function (st) { return st.subjects.length > 0; }); // 成績ゼロ件の生徒は一覧から除外
+
+  var homerooms = uniq_(roster.map(function (r) { return r.homeroom; }).filter(Boolean));
+  var out = { students: students, homerooms: homerooms };
+
+  try { cache.put(ckey, JSON.stringify(out), CONFIG.CACHE_STUDENTS_SEC); } catch (e) {}
+  return out;
+}
+
+/* 演習成績シート1枚を読み、name -> [{date,total,avg,hensachi}] を返す（A〜F列のみ）*/
+function readSubjectTotalsByName_(subjectKey) {
+  var out = {};
+  var sh = getSheet_(CONFIG.SCORES_SPREADSHEET_ID, CONFIG.SCORES_SHEETS[subjectKey]);
+  if (!sh) return out;
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return out;
+  var vals = sh.getRange(2, 1, lastRow - 1, 6).getValues(); // A..F
+  vals.forEach(function (row) {
+    var nm = String(row[0] || '').trim();
+    if (!nm) return;
+    var date = fmtAny_(row[2]);
+    if (!date) return;
+    var rec = { date: date, total: num_(row[3]), avg: round1_(num_(row[4])), hensachi: round1_(num_(row[5])) };
+    var key = normName_(nm);
+    (out[key] || (out[key] = [])).push(rec);
+  });
+  return out;
+}
+
+/* ===================== DETAIL (生徒1人) ===================== */
+function getDetail_(name, fresh) {
+  var cache = CacheService.getScriptCache();
+  var ckey = 'detail:' + name;
+  if (!fresh) {
+    var hit = cache.get(ckey);
+    if (hit) { try { return JSON.parse(hit); } catch (e) {} }
+  }
+
+  var roster = readRoster_();
+  var stu = null;
+  for (var i = 0; i < roster.length; i++) { if (normName_(roster[i].name) === normName_(name)) { stu = roster[i]; break; } }
+  if (!stu) return cacheNoData_(cache, ckey, { error: 'NO_DATA' });
+
+  var data = {};
+  var subjects = [];
+  var allMonths = {};
+  stu.subjects.forEach(function (s) {
+    var per = readScoresPerSubject_(stu.name, s);
+    if (per && per.totalTrend.length) {
+      data[s] = per;
+      subjects.push(s);
+      per.months.forEach(function (m) { allMonths[m] = true; });
+    }
+  });
+
+  var mock = readMockForStudent_(stu.name);
+
+  if (!subjects.length && (!mock || !mock.exams.length)) {
+    return cacheNoData_(cache, ckey, { error: 'NO_DATA' });
+  }
+
+  // 欠席率：履修科目すべて（成績の有無に関わらず）について科目別に取得。ヘッダー右のピル表示用。
+  var absence = {};
+  if (ABSENCE.ENABLED) {
+    var gTok = absGradeToken_(stu.grade);
+    stu.subjects.forEach(function (s) { absence[s] = readAbsenceForStudent_(stu.name, gTok, s); });
+  }
+
+  var months = Object.keys(allMonths).sort();
+  var detail = {
+    name: stu.name, grade: stu.grade, homeroom: stu.homeroom,
+    subjects: subjects,
+    months: months,
+    data: data,
+    mock: mock,
+    absence: absence,
+  };
+  var out = { detail: detail };
+  try { cache.put(ckey, JSON.stringify(out), CONFIG.CACHE_DETAIL_SEC); }
+  catch (e) { /* 100KB 超過などはキャッシュせず返すだけ */ }
+  return out;
+}
+
+/* 1科目分の演習データを整形（合計点推移 + 分野別月次, 欠測 null）
+ * 設計仕様（成績推移）に準拠：TextFinderで対象行を絞り込み、%書式は100倍補正、
+ * 未出題（平均得点率<=0）は月次から除外、全期間null分野は除去。               */
+function readScoresPerSubject_(name, subjectKey) {
+  var sh = getSheet_(CONFIG.SCORES_SPREADSHEET_ID, CONFIG.SCORES_SHEETS[subjectKey]);
+  if (!sh) return null;
+  var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  if (lastRow < 2) return null;
+
+  // A列で名前完全一致の行番号を TextFinder で特定
+  var finder = sh.getRange(1, 1, lastRow, 1).createTextFinder(name).matchEntireCell(true);
+  var matches = finder.findAll();
+  var rowNums = [];
+  matches.forEach(function (rng) { if (normName_(rng.getValue()) === normName_(name)) rowNums.push(rng.getRow()); });
+  if (!rowNums.length) return { fields: [], months: [], totalTrend: [], rate: {}, avgRate: {}, hensachi: {} };
+
+  var minR = Math.min.apply(null, rowNums), maxR = Math.max.apply(null, rowNums);
+  var block = sh.getRange(minR, 1, maxR - minR + 1, lastCol);
+  var vals = block.getValues();
+  var fmts = block.getNumberFormats();      // %書式検出用
+  var header = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+
+  // 使用する分野リスト：SCORES_FIELDS に定義があればそれ、無ければヘッダーから自動検出
+  var fields = fieldsForSubject_(subjectKey, header);
+  // 分野→列（得点率/平均得点率/偏差値）をヘッダーで特定（無ければ固定オフセット）
+  var fieldDefs = resolveFieldColumns_(fields, header);
+
+  // 対象行だけ抽出（minR..maxR の連続ブロックから rowNums のみ）
+  var picked = [];
+  rowNums.forEach(function (rn) {
+    var row = vals[rn - minR];
+    var date = fmtAny_(row[2]);
+    if (!date) return;
+    picked.push({ rowArr: row, fmtArr: fmts[rn - minR], date: date });
+  });
+  picked.sort(function (a, b) { return parseDate_(a.date) - parseDate_(b.date); });
+
+  // 合計点推移
+  var totalTrend = picked.map(function (p) {
+    return {
+      date: p.date,
+      test: String(p.rowArr[1] || '').trim(),
+      total: num_(p.rowArr[3]),
+      avg: round1_(num_(p.rowArr[4])),
+      hensachi: round1_(num_(p.rowArr[5])),
+    };
+  });
+
+  // 分野別 月次平均
+  var monthsSet = {};
+  picked.forEach(function (p) { monthsSet[p.date.slice(0, 7).replace('/', '-')] = true; });
+  var months = Object.keys(monthsSet).sort();
+  var monthIndex = {}; months.forEach(function (m, i) { monthIndex[m] = i; });
+
+  var rate = {}, avgRate = {}, hensachi = {};
+  // 月次の合算器
+  var acc = {}; // field -> month -> {r:[],a:[],h:[]}
+  fields.forEach(function (f) { acc[f] = months.map(function () { return { r: 0, a: 0, h: 0, n: 0 }; }); });
+
+  picked.forEach(function (p) {
+    var ym = p.date.slice(0, 7).replace('/', '-');
+    var mi = monthIndex[ym];
+    fields.forEach(function (f) {
+      var def = fieldDefs[f];
+      if (!def) return;
+      var rVal = readNum_(p.rowArr, p.fmtArr, def.rate);
+      var aVal = readNum_(p.rowArr, p.fmtArr, def.avgRate);
+      var hVal = readNum_(p.rowArr, p.fmtArr, def.hensachi);
+      // 出題判定：平均得点率>0。平均列が無ければ rate か hensachi が正なら出題扱い
+      var tested = (def.avgRate ? aVal > 0 : (rVal > 0 || hVal > 0));
+      if (!tested) return;
+      var cell = acc[f][mi];
+      cell.r += rVal; cell.a += aVal; cell.h += hVal; cell.n += 1;
+    });
+  });
+
+  fields.forEach(function (f) {
+    var rArr = [], aArr = [], hArr = [];
+    acc[f].forEach(function (c) {
+      if (c.n > 0) { rArr.push(round1_(c.r / c.n)); aArr.push(round1_(c.a / c.n)); hArr.push(round1_(c.h / c.n)); }
+      else { rArr.push(null); aArr.push(null); hArr.push(null); }
+    });
+    rate[f] = rArr; avgRate[f] = aArr; hensachi[f] = hArr;
+  });
+
+  // 全期間 null（本人未受験）の分野は丸ごと除去
+  var keptFields = fields.filter(function (f) { return rate[f].some(function (v) { return v != null; }); });
+  var R = {}, A = {}, H = {};
+  keptFields.forEach(function (f) { R[f] = rate[f]; A[f] = avgRate[f]; H[f] = hensachi[f]; });
+
+  return { fields: keptFields, months: months, totalTrend: totalTrend, rate: R, avgRate: A, hensachi: H };
+}
+
+/* 設定の分野リストを返す。空ならヘッダーの「<分野名> 得点率」から自動検出（出現順）。*/
+function fieldsForSubject_(subjectKey, header) {
+  var cfg = SCORES_FIELDS[subjectKey];
+  if (cfg && cfg.length) return cfg;
+  return autoFields_(header);
+}
+function autoFields_(header) {
+  var out = [], seen = {};
+  for (var i = 0; i < header.length; i++) {
+    var h = String(header[i] || '').trim();
+    if (h.slice(-5) === '平均得点率') continue;       // 「<分野> 平均得点率」列は分野見出しではない
+    var m = h.match(/^(.+?)\s*得点率$/);              // 「<分野> 得点率」だけを分野として採用
+    if (m) { var f = m[1].trim(); if (f && !seen[f]) { seen[f] = 1; out.push(f); } }
+  }
+  return out;
+}
+
+/* 分野名→{rate,avgRate,hensachi} 列番号(1始まり)。ヘッダー照合→固定オフセットの順。*/
+function resolveFieldColumns_(fields, header) {
+  var defs = {};
+  var norm = header.map(function (h) { return String(h || '').trim(); });
+
+  function findCol(label) { var i = norm.indexOf(label); return i >= 0 ? i + 1 : 0; }
+
+  fields.forEach(function (f, i) {
+    var rc = findCol(f + ' 得点率');
+    var ac = findCol(f + ' 平均得点率');
+    var hc = findCol(f + ' 偏差値');
+    if (!rc && !hc) {
+      // 固定オフセット（A..F の後、4列ずつ：分野名/得点率/平均得点率/偏差値）
+      var base = 7 + i * 4;     // 分野名列
+      rc = base + 1; ac = base + 2; hc = base + 3;
+    }
+    defs[f] = { rate: rc || 0, avgRate: ac || 0, hensachi: hc || 0 };
+  });
+  return defs;
+}
+
+/* 1セルを数値で読む。%書式の列は100倍補正（表示「40%」→内部0.4 を 40 に戻す）。*/
+function readNum_(rowArr, fmtArr, col1) {
+  if (!col1) return 0;
+  var idx = col1 - 1;
+  var v = num_(rowArr[idx]);
+  var fmt = String((fmtArr && fmtArr[idx]) || '');
+  if (fmt.indexOf('%') >= 0) v = v * 100;
+  return v;
+}
+
+/* ===================== ROSTER (生徒IDシート) ===================== */
+function readRoster_() {
+  var sh = getSheet_(CONFIG.ROSTER_SPREADSHEET_ID, ROSTER.SHEET);
+  if (!sh) return [];
+  var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  if (lastRow <= ROSTER.HEADER_ROWS) return [];
+  var vals = sh.getRange(ROSTER.HEADER_ROWS + 1, 1, lastRow - ROSTER.HEADER_ROWS, lastCol).getValues();
+  var C = ROSTER.COL;
+  var out = [];
+  vals.forEach(function (row) {
+    var name = String(cell_(row, C.name) || '').trim();
+    if (!name) return;
+    // E列（理科使用科目）が空白／未回答 の生徒は対象外。読み込み時点で除外して処理を軽くする。
+    var subjRaw = String(cell_(row, C.subjects) || '').trim();
+    if (!subjRaw || ROSTER.SKIP_SUBJECT_TOKENS.indexOf(subjRaw) >= 0) return;
+    var grade = String(cell_(row, C.grade) || '').trim();
+    var homeroom = String(cell_(row, C.homeroom) || '').trim();
+    var subjects = parseSubjects_(subjRaw);
+    out.push({ name: name, grade: grade, homeroom: homeroom, subjects: subjects });
+  });
+  return out;
+}
+
+function parseSubjects_(cellVal) {
+  var s = String(cellVal || '').trim();
+  if (!s) return [];
+  var parts = s.split(/[,、\s\/／・]+/).map(function (x) { return x.trim(); }).filter(Boolean);
+  var keys = [];
+  parts.forEach(function (p) {
+    var k = SUBJECT_LABEL_TO_KEY[p];
+    if (k && keys.indexOf(k) < 0) keys.push(k);
+  });
+  // 表示順に整列
+  keys.sort(function (a, b) { return SUBJECT_ORDER.indexOf(a) - SUBJECT_ORDER.indexOf(b); });
+  return keys;
+}
+
+/* ===================== MOCK (マーク模試フォーム) ===================== */
+function readMockForStudent_(name) {
+  var sh = getSheet_(CONFIG.MOCK_SPREADSHEET_ID, MOCK.SHEET);
+  if (!sh) return { exams: [], aspiration: null, aspHistory: [] };
+  var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  if (lastRow <= MOCK.HEADER_ROWS) return { exams: [], aspiration: null, aspHistory: [] };
+  var C = MOCK.COL;
+
+  // この回答シートは数万行あるため、名前列を TextFinder で絞り込み、該当行だけ読む。
+  var nameCol = sh.getRange(1, C.studentName, lastRow, 1);
+  var hits = nameCol.createTextFinder(name).matchEntireCell(true).findAll();
+  var rowNums = [];
+  hits.forEach(function (rng) {
+    if (rng.getRow() > MOCK.HEADER_ROWS && normName_(rng.getValue()) === normName_(name)) rowNums.push(rng.getRow());
+  });
+  if (!rowNums.length) return { exams: [], aspiration: null, aspHistory: [] };
+
+  var minR = Math.min.apply(null, rowNums), maxR = Math.max.apply(null, rowNums);
+  var block = sh.getRange(minR, 1, maxR - minR + 1, lastCol).getValues();
+  var rows = rowNums.map(function (rn) { return block[rn - minR]; });
+  // フォーム回答はタイムスタンプ昇順が基本だが、念のため日付で並べる
+  rows.sort(function (a, b) {
+    return (mockDate_(a) || 0) - (mockDate_(b) || 0);
+  });
+
+  var exams = rows.map(function (row) { return parseMockRow_(row, C); }).filter(Boolean);
+
+  // 志望校履歴（I列を時系列で、空でないものだけ）。最新＝末尾。
+  var aspHistory = [];
+  rows.forEach(function (row) {
+    // 志望校は旧列(9)・新列(10)の2系統。値がある方を採用（新列を優先）。
+    var sch = String(cell_(row, C.aspiration2) || cell_(row, C.aspiration) || '').trim();
+    if (!sch) return;
+    var date = mockDateStr_(row);
+    if (!aspHistory.length || aspHistory[aspHistory.length - 1].school !== sch) {
+      aspHistory.push({ date: date, school: sch });
+    }
+  });
+  var aspiration = aspHistory.length ? aspHistory[aspHistory.length - 1].school : null;
+
+  return { exams: exams, aspiration: aspiration, aspHistory: aspHistory };
+}
+
+function parseMockRow_(row, C) {
+  var date = mockDateStr_(row);
+  var examName = C.examName ? String(cell_(row, C.examName) || '').trim() : '';
+  if (!examName) examName = MOCK.EXAM_NAME_FALLBACK;
+
+  var isPartial = MOCK.PARTIAL_KEYWORDS.some(function (kw) { return examName.indexOf(kw) >= 0; });
+  var full = !isPartial;
+
+  var gendai = optNum_(row, C.kokugo_gendai), koten = optNum_(row, C.kokugo_koten), kanbun = optNum_(row, C.kokugo_kanbun);
+  var hasKokugo = full && (gendai != null || koten != null || kanbun != null);
+  var kokugo = hasKokugo ? { gendai: z_(gendai), koten: z_(koten), kanbun: z_(kanbun), total: z_(gendai) + z_(koten) + z_(kanbun) } : null;
+
+  var w = optNum_(row, C.eigo_w), l = optNum_(row, C.eigo_l);
+  var eigo = { w: z_(w), l: z_(l), total: z_(w) + z_(l) };
+
+  var ia = optNum_(row, C.math_ia), iib = optNum_(row, C.math_iib);
+  var math = { ia: z_(ia), iib: (iib == null ? null : iib) };
+
+  var rika = [
+    mkSubj_(row, C.rika1_name, C.rika1_score, full),
+    mkSubj_(row, C.rika2_name, C.rika2_score, full),
+    mkSubj_(row, C.rika3_name, C.rika3_score, full),
+  ];
+  var shakai = [
+    mkSubj_(row, C.shakai1_name, C.shakai1_score, full),
+    mkSubj_(row, C.shakai2_name, C.shakai2_score, full),
+  ];
+  var joho = full ? optNum_(row, C.joho) : null;
+  if (joho === undefined) joho = null;
+
+  // 合計点：列があればそれを優先、無ければ素点合算
+  var total = optNum_(row, C.total);
+  if (total == null) {
+    total = (kokugo ? kokugo.total : 0) + eigo.total + z_(math.ia) + z_(math.iib)
+      + rika.reduce(function (s, x) { return s + z_(x.score); }, 0)
+      + shakai.reduce(function (s, x) { return s + z_(x.score); }, 0)
+      + z_(joho);
+  }
+
+  return { date: date, name: examName, full: full, kokugo: kokugo, eigo: eigo, math: math, rika: rika, shakai: shakai, joho: (joho == null ? null : joho), total: total };
+}
+
+function mkSubj_(row, nameCol, scoreCol, full) {
+  if (!full || !nameCol) return { name: MOCK.NOT_TAKEN, score: null };
+  var nm = String(cell_(row, nameCol) || '').trim();
+  var sc = optNum_(row, scoreCol);
+  if (!nm || nm === MOCK.NOT_TAKEN || sc == null) return { name: MOCK.NOT_TAKEN, score: null };
+  return { name: nm, score: sc };
+}
+
+function mockDate_(row) { return parseDate_(mockDateStr_(row)); }
+function mockDateStr_(row) {
+  var C = MOCK.COL;
+  var raw = C.date ? cell_(row, C.date) : cell_(row, C.timestamp);
+  return fmtAny_(raw);
+}
+
+/* ===================== ABSENCE (授業欠席率) ===================== */
+/* 学年トークン正規化（名簿の学年表記 → 欠席率タブの学年トークン）。未知はそのまま。*/
+function absGradeToken_(grade) {
+  var g = String(grade || '').trim();
+  return ABSENCE.GRADE_ALIAS[g] || g;
+}
+
+var _absSS_ = undefined;
+function absSpreadsheet_() {
+  if (_absSS_ !== undefined) return _absSS_;
+  try { _absSS_ = SpreadsheetApp.openById(ABSENCE.SPREADSHEET_ID); }
+  catch (e) { _absSS_ = null; }
+  return _absSS_;
+}
+
+/* 「<学年トークン> <科目ラベル>」タブを解決。完全名→空白区切りトークン一致 の順。
+ * 科目ラベルの部分一致（化学 と 化学基礎）を避けるため、トークン完全一致で判定する。*/
+function resolveAbsenceSheet_(gradeToken, label) {
+  var ss = absSpreadsheet_();
+  if (!ss) return null;
+  var sh = ss.getSheetByName(gradeToken + ' ' + label) || ss.getSheetByName(gradeToken + '　' + label);
+  if (sh) return sh;
+  // フォールバック：半角/全角スペース区切りのトークンに「学年」と「科目ラベル」が両方あるタブ。
+  // 科目ラベルはトークン完全一致（化学 と 化学基礎 の誤マッチ防止）。
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    var toks = sheets[i].getName().split(/[\s　]+/);
+    if (toks.indexOf(gradeToken) >= 0 && toks.indexOf(label) >= 0) return sheets[i];
+  }
+  return null;
+}
+
+/* 欠席率タブの 生徒名列 / 欠席率列（1始まり）をヘッダーから特定。*/
+function absCols_(sh) {
+  var lastCol = sh.getLastColumn();
+  var header = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  var nameCol = 0, rateCol = 0;
+  for (var i = 0; i < header.length; i++) {
+    var h = String(header[i] || '').trim();
+    if (h === ABSENCE.STUDENT_HEADER) nameCol = i + 1;
+    if (h === ABSENCE.RATE_HEADER) rateCol = i + 1;
+  }
+  return { nameCol: nameCol, rateCol: rateCol, lastCol: lastCol };
+}
+
+/* 1学年×1科目タブを読み、normName → 欠席率(%) のマップを返す（一覧用・まとめ読み）。*/
+function readAbsenceMap_(gradeToken, subjectKey) {
+  if (!ABSENCE.ENABLED) return {};
+  var label = ABSENCE.SUBJECT_LABEL[subjectKey];
+  if (!label) return {};
+  var sh = resolveAbsenceSheet_(gradeToken, label);
+  if (!sh) return {};
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return {};
+  var c = absCols_(sh);
+  if (!c.nameCol || !c.rateCol) return {};
+  var vals = sh.getRange(2, 1, lastRow - 1, c.lastCol).getValues();
+  var map = {};
+  vals.forEach(function (r) {
+    var nm = String(r[c.nameCol - 1] || '').trim();
+    if (!nm) return;
+    var v = r[c.rateCol - 1];
+    if (v === '' || v == null) return;
+    map[normName_(nm)] = round1_(num_(v));
+  });
+  return map;
+}
+
+/* 1生徒×1科目の欠席率（%）を取得（詳細用・TextFinderで該当行だけ）。無ければ null。*/
+function readAbsenceForStudent_(name, gradeToken, subjectKey) {
+  if (!ABSENCE.ENABLED) return null;
+  var label = ABSENCE.SUBJECT_LABEL[subjectKey];
+  if (!label) return null;
+  var sh = resolveAbsenceSheet_(gradeToken, label);
+  if (!sh) return null;
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return null;
+  var c = absCols_(sh);
+  if (!c.nameCol || !c.rateCol) return null;
+  var hits = sh.getRange(1, c.nameCol, lastRow, 1).createTextFinder(name).matchEntireCell(true).findAll();
+  for (var j = 0; j < hits.length; j++) {
+    var rn = hits[j].getRow();
+    if (rn < 2) continue;
+    if (normName_(hits[j].getValue()) === normName_(name)) {
+      var v = sh.getRange(rn, c.rateCol).getValue();
+      if (v === '' || v == null) return null;
+      return round1_(num_(v));
+    }
+  }
+  return null;
+}
+
+/* ===================== helpers ===================== */
+function getSheet_(ssId, sheetName) {
+  try {
+    var ss = SpreadsheetApp.openById(ssId);
+    return ss.getSheetByName(sheetName);
+  } catch (e) { return null; }
+}
+function cell_(row, col1) { return col1 ? row[col1 - 1] : ''; }
+function num_(v) { var n = (typeof v === 'number') ? v : parseFloat(String(v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
+function optNum_(row, col1) {
+  if (!col1) return null;
+  var v = row[col1 - 1];
+  if (v === '' || v === null || v === undefined) return null;
+  var n = (typeof v === 'number') ? v : parseFloat(String(v).replace(/[^0-9.\-]/g, ''));
+  return isNaN(n) ? null : n;
+}
+function z_(v) { return v == null ? 0 : v; }
+function round1_(v) { return Math.round(v * 10) / 10; }
+function normName_(s) { return String(s || '').replace(/\s/g, ''); }
+function uniq_(arr) { var seen = {}, out = []; arr.forEach(function (x) { if (!seen[x]) { seen[x] = 1; out.push(x); } }); return out; }
+function byDateAsc_(a, b) { return parseDate_(a.date) - parseDate_(b.date); }
+function parseDate_(s) { if (!s) return null; var d = new Date(String(s).replace(/\//g, '-')); return isNaN(d) ? null : d; }
+function fmtDate_(d) { return Utilities.formatDate(d, TZ, 'yyyy/MM/dd'); }
+function fmtAny_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, TZ, 'yyyy/MM/dd');
+  var s = String(v || '').trim();
+  if (!s) return '';
+  // "2026-04-03 12:00:00" / "2026/4/3" 等を yyyy/MM/dd に正規化
+  var d = new Date(s.replace(/\//g, '-'));
+  if (!isNaN(d)) return Utilities.formatDate(d, TZ, 'yyyy/MM/dd');
+  return s;
+}
+function cacheNoData_(cache, ckey, obj) {
+  try { cache.put(ckey, JSON.stringify(obj), CONFIG.CACHE_NODATA_SEC); } catch (e) {}
+  return obj;
+}
+
+/* ===================== セルフテスト（任意）=====================
+ * エディタで実行すると、設定が正しいか簡易チェックしてログに出します。 */
+function selfTest() {
+  // ── 生徒IDシートの診断（roster が 0 のとき原因を切り分ける）──
+  var ss = null;
+  try { ss = SpreadsheetApp.openById(CONFIG.ROSTER_SPREADSHEET_ID); }
+  catch (e) { Logger.log('★ ROSTER スプレッドシートを開けません: %s', e.message); }
+  if (ss) {
+    Logger.log('ROSTER ファイル名: 「%s」', ss.getName());
+    Logger.log('ROSTER タブ一覧: %s', ss.getSheets().map(function (s) { return '「' + s.getName() + '」'; }).join(' / '));
+    var rsh = ss.getSheetByName(ROSTER.SHEET);
+    if (!rsh) {
+      Logger.log('★ タブ「%s」が見つかりません。上のタブ一覧から正しい名前を ROSTER.SHEET に設定してください。', ROSTER.SHEET);
+    } else {
+      Logger.log('タブ「%s」 lastRow=%s lastCol=%s', ROSTER.SHEET, rsh.getLastRow(), rsh.getLastColumn());
+      var n = Math.max(1, Math.min(4, rsh.getLastRow()));
+      var sample = rsh.getRange(1, 1, n, Math.min(6, rsh.getLastColumn() || 1)).getValues();
+      Logger.log('先頭セル A1..F%s: %s', n, JSON.stringify(sample));
+    }
+  }
+
+  var roster = readRoster_();
+  Logger.log('roster: %s 名', roster.length);
+  if (roster.length) {
+    // 成績シートのある科目（化学/生物）を履修している生徒を優先してテスト対象にする
+    var st = roster[0];
+    for (var i = 0; i < roster.length; i++) {
+      if (roster[i].subjects.indexOf('chemistry') >= 0 || roster[i].subjects.indexOf('biology') >= 0) { st = roster[i]; break; }
+    }
+    Logger.log('テスト対象: %s', JSON.stringify(st));
+
+    // 成績シートが存在する科目だけで詳細を確認（基礎科目はシート未作成のためスキップ）
+    var scoreSubj = null;
+    st.subjects.forEach(function (s) { if (!scoreSubj && CONFIG.SCORES_SHEETS[s]) scoreSubj = s; });
+    if (scoreSubj) {
+      var per = readScoresPerSubject_(st.name, scoreSubj);
+      if (per) {
+        Logger.log('detail[%s/%s] totalTrend=%s, fields=%s, months=%s',
+          st.name, scoreSubj, per.totalTrend.length, per.fields.length, JSON.stringify(per.months));
+      } else {
+        Logger.log('detail[%s/%s]: 成績シートが見つからずスキップ', st.name, scoreSubj);
+      }
+    } else {
+      Logger.log('detail: この生徒は成績シート対象科目（化学/生物）を履修していません');
+    }
+
+    var mock = readMockForStudent_(st.name);
+    Logger.log('mock exams=%s, aspiration=%s', mock.exams.length, mock.aspiration);
+
+    // 欠席率：先頭生徒の各履修科目について、タブ解決と取得値を確認
+    if (ABSENCE.ENABLED) {
+      var gTok = absGradeToken_(st.grade);
+      st.subjects.forEach(function (s) {
+        var label = ABSENCE.SUBJECT_LABEL[s];
+        var sh = resolveAbsenceSheet_(gTok, label);
+        var rate = readAbsenceForStudent_(st.name, gTok, s);
+        Logger.log('absence[%s/%s]: tab=%s rate=%s', s, label, sh ? sh.getName() : '(見つからず)', rate);
+      });
+    }
+  }
+}

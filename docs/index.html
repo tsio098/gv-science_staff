@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GV Science — 先生用 成績ダッシュボード</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="gradetrend.css" />
+<link rel="stylesheet" href="teacher.css" />
+</head>
+<body>
+
+<div id="root"></div>
+
+<!-- React + Babel ─────────────────────────────────────────────────────── -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+
+<!-- 設定・定数・データ取得層（プレーンJS：Babel変換前に実行される）──────── -->
+<script src="config.js"></script>
+<script src="constants.js"></script>
+<script src="sample-data.js"></script>
+<script src="api.js"></script>
+
+<!-- アイコン・チャート・画面・シェル（JSX）───────────────────────────────── -->
+<script type="text/babel" src="icons.jsx"></script>
+<script type="text/babel" src="charts.jsx"></script>
+<script type="text/babel" src="list.jsx"></script>
+<script type="text/babel" src="detail.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+
+</body>
+</html>
