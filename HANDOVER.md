@@ -1,5 +1,54 @@
 # Session Handover
-生成日時: 2026-06-05 13:45
+生成日時: 2026-06-05 13:45（最終更新: 2026-06-05 セッション3）
+
+## ★ セッション3 サマリー（最新の変更・ここを最初に読む）
+このセッションで追加・変更した内容（すべて `docs/` フロント中心、GAS再デプロイ不要のものが多い）:
+
+1. **詳細ヘッダーの見出し統一＋科目セクションのグループ化**（detail.jsx / teacher.css）
+   - 模試カードの空状態見出しを「全国一斉模試」→「模試の成績推移」に統一。
+   - 科目タブの上に区切り線＋eyebrow「科目別の成績推移」を置き、`tw-subject-section` でタブ＋合計点＋分野別を1グループ化（模試カードと視覚的に分離）。
+
+2. **分野別チャートを3指標統合**（charts.jsx `FieldMultiChart` 新設 / detail.jsx）
+   - 旧：得点率/平均得点率/偏差値を指標トグルで切替。新：選択分野ごとに「得点率=実線・平均得点率=破線（左軸%）＋偏差値=細線（右軸）」を1グラフに重ねる（合計点グラフと同型）。線の色＝分野。指標トグルは「得点傾向」ビューにのみ残置。
+
+3. **縦軸0–100クランプ**（charts.jsx `bounds()` に clamp 引数追加）
+   - 合計点グラフ左軸（点）と分野別の%左軸を min0/max100 の範囲に収める。偏差値の右軸は自動のまま。
+
+4. **詳細画面の PDF 出力（B4・横）**（detail.jsx `onPrintPDF` / teacher.css `@media print`）
+   - 「PDF出力（B4・横）」ボタン（`gv-print-bar`、`tw-detail-topbar`）。押すと @page を `B4 landscape` で注入→`window.print()`。
+   - 1枚に収める4要素のみ表示：**欠席率ピル / 模試成績表 / 合計点グラフ / 分野別（得点傾向・得点率）**。操作UI・テスト記録一覧（`.gt-tests`）・分野月次（`.gt-fd`）・注記は印刷時 `display:none`。
+   - レイアウト：模試表は全幅、その下を `tw-detail-grid` で2カラム（左0.82fr=合計点 / 右1.18fr=分野別）。
+   - **分野別はPDFでは「得点傾向（得意/苦手の横棒）」を表示**：`onPrintPDF` が `setFv('strengths')+setMetric('rate')` してから印刷。Webの得点傾向デザイン（背景バー絶対配置・2カラム・分野名は nowrap+省略記号）を踏襲（簡易1カラム化はやめた）。件数は `swCount`：化学/生物=上位下位5件ずつ、基礎=3件ずつ。
+   - 向きは横が収めやすい（模試表が横長＝列が多いため）。
+
+5. **ロゴを本物の蟹画像に**（icons.jsx / `docs/assets/crab-cutout-orange.png`）
+   - 以前は `<img src="assets/crab-cutout-orange.png">` 参照だが画像が無く非表示だった。ユーザーが **`docs/assets/crab-cutout-orange.png`（190×190 透過PNG）** を追加済み。`LogoMark`→`CrabImg`（img、onError時は内蔵 `CrabSVG` にフォールバック）。assetsフォルダ・ファイル名固定。
+
+6. **一覧「下降」フラグの条件変更**（Code.gs / sample-data.js）
+   - 旧：偏差値の前回比 ≤ −3。新：**いずれかの科目で偏差値が2回連続で下降**（直近3テストの偏差値が単調減少 h[n]<h[n-1]<h[n-2]）。横ばいは下降に数えない／3件未満の科目は対象外。`FLAG_DECLINING_DELTA` はフラグ判定では未使用（落ち込み順ソートの `worstDelta` 用に残置）。**要GAS再デプロイ**（バックエンド変更のため）。`stale`(30日)・「要注目=下降 or 長期未受験」は不変。
+
+7. **起動時パスワードゲート（必須）**（config.js / app.jsx）
+   - `config.js`：`AUTH_ENABLED: true`、`ACCESS_TOKEN: 'great098'`。
+   - `app.jsx`：認証画面の入力を `type="password"`（伏字）に、文言を「パスワード」表記へ。送信時に `great098` 不一致なら「パスワードが違います」表示で開けない。`?token=` での素通りも塞ぎ、初期 authed 判定も `getToken()===ACCESS_TOKEN` を要求。パスワードは sessionStorage（タブ閉じで破棄）。
+   - これはフロント側の簡易ゲート（公開リポジトリのためコードから読める）。サーバ厳密化は GAS `CONFIG.AUTH_ENABLED=true`+`ACCESS_TOKEN='great098'`+再デプロイで二重化可能（未実施）。
+
+### セッション3時点の未反映・要対応
+- [ ] **フロントを push**（上記1〜7の docs 変更を反映）。`cd 成績一覧表示 && git add . && git commit -m "..." && git push`。
+- [ ] **GASを再デプロイ**：欠席率の `absCols_` 動的ヘッダー検出（セッション2修正）＋「2回連続下降」フラグ（セッション3）の反映に必要。`Code.gs` を貼り直し→デプロイ管理→既存デプロイを編集→新バージョン。`/exec` URLは変えないこと（変わると `config.js` 更新＋push必要）。
+- [ ] 検証：全JSX（icons/charts/list/detail/app）Babelトランスパイル通過・Code.gs/sample-data.js `node --check` OK は確認済み。実機での見た目・PDF1枚収まり・パスワード画面は未確認。
+
+### よく使う調整ポイント（場所）
+- 欠席率しきい値：`docs/constants.js` `ABS_WARN=15`/`ABS_BAD=30`。
+- 得点傾向の表示件数：`docs/detail.jsx` `swCount()`（化学/生物5・基礎3）。
+- 下降/未受験の基準：`gas/Code.gs` CONFIG（`FLAG_STALE_DAYS`、下降は getStudents_ 内の連続下降ロジック）。
+- 軸クランプ：`docs/charts.jsx` `bounds(...,{lo:0,hi:100})`。
+- PDFレイアウト：`docs/teacher.css` の `@media print` ブロック。
+- パスワード：`docs/config.js` `ACCESS_TOKEN`。
+
+---
+（以下はセッション1〜2の記録）
+
+
 
 ## タスクの目的
 塾・予備校「GV Science」の**先生用 成績ダッシュボード**（読み取り専用Webアプリ）を本番稼働させる。

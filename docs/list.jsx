@@ -277,11 +277,23 @@ function ListSkeleton({ layout }) {
   );
 }
 
+// ── 一覧の絞り込み/並べ替えを保持（ブラウザ戻りで一覧に戻っても解除されないように）──
+//   sessionStorage に保存し、画面の再マウント時に復元する（タブを閉じると破棄）。
+const LIST_PREF = {
+  get(k, d) { try { const v = sessionStorage.getItem('gv-listpref:' + k); return v == null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { sessionStorage.setItem('gv-listpref:' + k, v); } catch (e) {} },
+};
+
 // ── the screen ────────────────────────────────────────────
 function StudentListScreen({ nav, query, layout = 'table', state = 'normal', density, showOverview = true }) {
-  const [subjectFilter, setSubjectFilter] = React.useState('all');
-  const [homeroomFilter, setHomeroomFilter] = React.useState('all');
-  const [sort, setSort] = React.useState('name');
+  const [subjectFilter, setSubjectFilter] = React.useState(() => LIST_PREF.get('subjectFilter', 'all'));
+  const [homeroomFilter, setHomeroomFilter] = React.useState(() => LIST_PREF.get('homeroomFilter', 'all'));
+  const [sort, setSort] = React.useState(() => LIST_PREF.get('sort', 'name'));
+
+  // 変更を保存（次回マウント＝戻り時に復元される）
+  React.useEffect(() => { LIST_PREF.set('subjectFilter', subjectFilter); }, [subjectFilter]);
+  React.useEffect(() => { LIST_PREF.set('homeroomFilter', homeroomFilter); }, [homeroomFilter]);
+  React.useEffect(() => { LIST_PREF.set('sort', sort); }, [sort]);
 
   // filter by search query (header) + subject + homeroom
   const q = (query || '').trim();

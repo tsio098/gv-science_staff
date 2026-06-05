@@ -47,9 +47,13 @@ var CONFIG = {
   },
 
   // キャッシュ秒数
-  CACHE_STUDENTS_SEC: 30 * 60, // 一覧 30分
-  CACHE_DETAIL_SEC:   30 * 60, // 詳細 30分
-  CACHE_NODATA_SEC:   60,      // データ無しは短く
+  //  ★ スナップショット方式：30分ごとの時間トリガー rebuildSnapshot が一覧＋全生徒詳細を
+  //    まとめて再計算し、下の TTL でキャッシュします。TTL を長め(6時間)にしているのは
+  //    「万一トリガーが1回失敗してもキャッシュが空にならない」ための保険で、表示の鮮度は
+  //    トリガー間隔（=実質30分）で決まります。データ入力直後は「更新」ボタン（fresh=1）で即時反映。
+  CACHE_STUDENTS_SEC: 6 * 60 * 60, // 一覧 6時間（トリガーが30分ごとに上書き）
+  CACHE_DETAIL_SEC:   6 * 60 * 60, // 詳細 6時間（同上）
+  CACHE_NODATA_SEC:   5 * 60,      // データ無しは短く（5分）
 
   // 一覧の「要注目」判定
   // 「下降」フラグ＝いずれかの科目で偏差値が2回連続で下降（直近3テストが単調減少）。
@@ -190,48 +194,43 @@ function json_(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-/* ===================== STUDENTS (一覧サマリー) ===================== */
+/* ===================== STUDENTS (一覧サマリー) =====================
+ * スナップショット方式：通常はキャッシュ（30分トリガーが温め続ける）から即返す。
+ * キャッシュが無い／fresh=1（更新ボタン）のときだけ rebuildAll_ で全再計算する。   */
 function getStudents_(fresh) {
   var cache = CacheService.getScriptCache();
-  var ckey = 'students';
   if (!fresh) {
-    var hit = cache.get(ckey);
+    var hit = cacheGetBig_(cache, 'students');
     if (hit) { try { return JSON.parse(hit); } catch (e) {} }
   }
+  var res = rebuildAll_(fresh);
+  return { students: res.students, homerooms: res.homerooms };
+}
 
-  var roster = readRoster_();                 // [{name,grade,subjects[],homeroom}]
-  if (!roster.length) return cacheNoData_(cache, ckey, { error: 'NO_DATA' });
-
-  // 履修されている科目だけ、演習成績シートを1回ずつ読み name→[{date,total,avg,hensachi}] に索引化
-  var usedSubjects = {};
-  roster.forEach(function (r) { r.subjects.forEach(function (s) { usedSubjects[s] = true; }); });
-  var index = {};                              // subjectKey -> { name -> rows[] }
-  Object.keys(usedSubjects).forEach(function (s) { index[s] = readSubjectTotalsByName_(s); });
-
-  // 欠席率：学年×科目タブを1回ずつ読み normName→% に索引化
-  var absIndex = {};                           // "gradeToken|subjectKey" -> { name -> rate }
-  if (ABSENCE.ENABLED) {
-    roster.forEach(function (r) {
-      var g = absGradeToken_(r.grade);
-      r.subjects.forEach(function (s) {
-        var k = g + '|' + s;
-        if (!(k in absIndex)) absIndex[k] = readAbsenceMap_(g, s);
-      });
-    });
-  }
+/* roster と「科目→(normName→演習行)」「学年|科目→欠席率マップ」から一覧サマリーを構築。
+ * シートI/Oは一切せず、事前ロード済みデータだけで計算する（rebuildAll_ から呼ぶ）。   */
+function buildStudentsList_(roster, scoresLoaded, absMaps) {
+  // 科目ごとに normName→[{date,total,avg,hensachi}]（A〜F相当）を事前ロードから索引化
+  var totalsIndex = {};
+  Object.keys(scoresLoaded).forEach(function (s) {
+    var L = scoresLoaded[s];
+    var m = {};
+    if (L) Object.keys(L.byName).forEach(function (nn) { m[nn] = subjectTotalsFromPicked_(L.byName[nn]); });
+    totalsIndex[s] = m;
+  });
 
   var today = new Date();
   var students = roster.map(function (r) {
     var perSubject = {};
     var lastExam = null, worstDelta = 0, declining = false;
     r.subjects.forEach(function (s) {
-      var rows = (index[s] && index[s][normName_(r.name)]) || [];
-      rows.sort(byDateAsc_);
+      var rows = (totalsIndex[s] && totalsIndex[s][normName_(r.name)]) || [];
+      rows = rows.slice().sort(byDateAsc_);
       if (!rows.length) return;
       var last = rows[rows.length - 1], prev = rows[rows.length - 2];
       var dHen = prev ? round1_(last.hensachi - prev.hensachi) : 0;
       var dTot = prev ? (last.total - prev.total) : 0;
-      var am = absIndex[absGradeToken_(r.grade) + '|' + s];
+      var am = absMaps[absGradeToken_(r.grade) + '|' + s];
       var abVal = am ? am[normName_(r.name)] : undefined;
       perSubject[s] = {
         lastHensachi: last.hensachi,
@@ -274,89 +273,188 @@ function getStudents_(fresh) {
   }).filter(function (st) { return st.subjects.length > 0; }); // 成績ゼロ件の生徒は一覧から除外
 
   var homerooms = uniq_(roster.map(function (r) { return r.homeroom; }).filter(Boolean));
-  var out = { students: students, homerooms: homerooms };
-
-  try { cache.put(ckey, JSON.stringify(out), CONFIG.CACHE_STUDENTS_SEC); } catch (e) {}
-  return out;
+  return { students: students, homerooms: homerooms };
 }
 
-/* 演習成績シート1枚を読み、name -> [{date,total,avg,hensachi}] を返す（A〜F列のみ）*/
-function readSubjectTotalsByName_(subjectKey) {
-  var out = {};
-  var sh = getSheet_(CONFIG.SCORES_SPREADSHEET_ID, CONFIG.SCORES_SHEETS[subjectKey]);
-  if (!sh) return out;
-  var lastRow = sh.getLastRow();
-  if (lastRow < 2) return out;
-  var vals = sh.getRange(2, 1, lastRow - 1, 6).getValues(); // A..F
-  vals.forEach(function (row) {
-    var nm = String(row[0] || '').trim();
-    if (!nm) return;
-    var date = fmtAny_(row[2]);
-    if (!date) return;
-    var rec = { date: date, total: num_(row[3]), avg: round1_(num_(row[4])), hensachi: round1_(num_(row[5])) };
-    var key = normName_(nm);
-    (out[key] || (out[key] = [])).push(rec);
+/* roster 全体で必要な「学年トークン|科目」欠席率マップを、各タブ1回読みで構築。*/
+function buildAbsenceMapsForRoster_(roster) {
+  var absMaps = {}; // "gradeToken|subjectKey" -> { normName -> rate }
+  if (!ABSENCE.ENABLED) return absMaps;
+  roster.forEach(function (r) {
+    var g = absGradeToken_(r.grade);
+    r.subjects.forEach(function (s) {
+      var k = g + '|' + s;
+      if (!(k in absMaps)) absMaps[k] = readAbsenceMap_(g, s);
+    });
   });
+  return absMaps;
+}
+
+/* 事前ロード行（[{rowArr,fmtArr,date}]）→ 一覧用 [{date,total,avg,hensachi}] */
+function subjectTotalsFromPicked_(picked) {
+  return picked.map(function (p) {
+    return { date: p.date, total: num_(p.rowArr[3]), avg: round1_(num_(p.rowArr[4])), hensachi: round1_(num_(p.rowArr[5])) };
+  });
+}
+
+/* 演習成績シート1枚を「丸ごと1回」読み、header と normName→[{rowArr,fmtArr,date}] を返す。
+ * 全列＋数値書式を1回で取得し、生徒ごとの TextFinder を不要にする（rebuildAll_ 用）。 */
+function loadScoresSheet_(subjectKey) {
+  var sh = getSheet_(CONFIG.SCORES_SPREADSHEET_ID, CONFIG.SCORES_SHEETS[subjectKey]);
+  if (!sh) return null;
+  var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return { header: [], byName: {} };
+  var rng = sh.getRange(1, 1, lastRow, lastCol);
+  var vals = rng.getValues();
+  var fmts = rng.getNumberFormats();
+  var header = vals[0];
+  var byName = {};
+  for (var r = 1; r < vals.length; r++) {
+    var row = vals[r];
+    var nm = String(row[0] || '').trim();
+    if (!nm) continue;
+    var date = fmtAny_(row[2]);
+    if (!date) continue;
+    var key = normName_(nm);
+    (byName[key] || (byName[key] = [])).push({ rowArr: row, fmtArr: fmts[r], date: date });
+  }
+  return { header: header, byName: byName };
+}
+
+/* マーク模試シート(約2.9万行)を「丸ごと1回」読み、normName→[行配列] を返す（rebuildAll_ 用）。*/
+function loadMockByName_() {
+  var out = {};
+  var sh = getSheet_(CONFIG.MOCK_SPREADSHEET_ID, MOCK.SHEET);
+  if (!sh) return out;
+  var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  if (lastRow <= MOCK.HEADER_ROWS || lastCol < 1) return out;
+  var vals = sh.getRange(MOCK.HEADER_ROWS + 1, 1, lastRow - MOCK.HEADER_ROWS, lastCol).getValues();
+  var nameIdx = MOCK.COL.studentName - 1;
+  for (var i = 0; i < vals.length; i++) {
+    var row = vals[i];
+    var nm = normName_(row[nameIdx]);
+    if (!nm) continue;
+    (out[nm] || (out[nm] = [])).push(row);
+  }
   return out;
 }
 
-/* ===================== DETAIL (生徒1人) ===================== */
+/* ===================== DETAIL (生徒1人) =====================
+ * スナップショット方式：通常はキャッシュ（30分トリガーが温め続ける）から即返す。
+ * キャッシュが無い／fresh=1 のときだけ rebuildAll_ で全再計算し、該当生徒を返す。     */
 function getDetail_(name, fresh) {
   var cache = CacheService.getScriptCache();
-  var ckey = 'detail:' + name;
+  var ckey = 'detail:' + normName_(name);
   if (!fresh) {
-    var hit = cache.get(ckey);
+    var hit = cacheGetBig_(cache, ckey);
     if (hit) { try { return JSON.parse(hit); } catch (e) {} }
   }
 
+  if (fresh) {
+    // 「更新」ボタン：全員分を作り直してから該当生徒をキャッシュから返す。
+    rebuildAll_(true);
+    var hit2 = cacheGetBig_(cache, ckey);
+    if (hit2) { try { return JSON.parse(hit2); } catch (e) {} }
+    try { cachePutBig_(cache, ckey, JSON.stringify({ error: 'NO_DATA' }), CONFIG.CACHE_NODATA_SEC); } catch (e) {}
+    return { error: 'NO_DATA' };
+  }
+
+  // ★C: 非fresh のキャッシュ未ヒット → 全再計算せず、その1人だけライブ計算（約3〜6秒）。
+  //     スナップショットが温まっていれば通常ここには来ない（保険＆コールド時の単発高速化）。
+  var d = computeDetailLive_(name);
+  if (!d) {
+    try { cachePutBig_(cache, ckey, JSON.stringify({ error: 'NO_DATA' }), CONFIG.CACHE_NODATA_SEC); } catch (e) {}
+    return { error: 'NO_DATA' };
+  }
+  try { cachePutBig_(cache, ckey, JSON.stringify({ detail: d }), CONFIG.CACHE_DETAIL_SEC); } catch (e) {}
+  return { detail: d };
+}
+
+/* 1生徒分の詳細をライブ計算（シートを開いて TextFinder。その生徒だけ）。無ければ null。
+ * 全再計算 rebuildAll_ の重さを避けるためのフォールバック（getDetail_ の非fresh未ヒット時）。*/
+function computeDetailLive_(name) {
   var roster = readRoster_();
   var stu = null;
   for (var i = 0; i < roster.length; i++) { if (normName_(roster[i].name) === normName_(name)) { stu = roster[i]; break; } }
-  if (!stu) return cacheNoData_(cache, ckey, { error: 'NO_DATA' });
+  if (!stu) return null;
 
-  var data = {};
-  var subjects = [];
-  var allMonths = {};
+  var data = {}, subjects = [], allMonths = {};
   stu.subjects.forEach(function (s) {
     var per = readScoresPerSubject_(stu.name, s);
     if (per && per.totalTrend.length) {
-      data[s] = per;
-      subjects.push(s);
+      data[s] = per; subjects.push(s);
       per.months.forEach(function (m) { allMonths[m] = true; });
     }
   });
-
   var mock = readMockForStudent_(stu.name);
+  if (!subjects.length && (!mock || !mock.exams.length)) return null;
 
-  if (!subjects.length && (!mock || !mock.exams.length)) {
-    return cacheNoData_(cache, ckey, { error: 'NO_DATA' });
-  }
-
-  // 欠席率：履修科目すべて（成績の有無に関わらず）について科目別に取得。ヘッダー右のピル表示用。
   var absence = {};
   if (ABSENCE.ENABLED) {
     var gTok = absGradeToken_(stu.grade);
     stu.subjects.forEach(function (s) { absence[s] = readAbsenceForStudent_(stu.name, gTok, s); });
   }
-
   var months = Object.keys(allMonths).sort();
-  var detail = {
+  return {
     name: stu.name, grade: stu.grade, homeroom: stu.homeroom,
-    subjects: subjects,
-    months: months,
-    data: data,
-    mock: mock,
-    absence: absence,
+    subjects: subjects, months: months, data: data, mock: mock, absence: absence,
   };
-  var out = { detail: detail };
-  try { cache.put(ckey, JSON.stringify(out), CONFIG.CACHE_DETAIL_SEC); }
-  catch (e) { /* 100KB 超過などはキャッシュせず返すだけ */ }
+}
+
+/* 事前ロード済みデータだけで、roster 全生徒の詳細 detail を構築（シートI/Oなし）。
+ * 戻り値: { normName -> detailObj }。成績もマーク模試も無い生徒は含めない。           */
+function buildAllDetails_(roster, scoresLoaded, mockByName, absMaps) {
+  var out = {};
+  roster.forEach(function (stu) {
+    var data = {};
+    var subjects = [];
+    var allMonths = {};
+    stu.subjects.forEach(function (s) {
+      var L = scoresLoaded[s];
+      if (!L) return;
+      var picked = L.byName[normName_(stu.name)];
+      if (!picked || !picked.length) return;
+      var per = computeScoresPerSubject_(s, L.header, picked);
+      if (per && per.totalTrend.length) {
+        data[s] = per;
+        subjects.push(s);
+        per.months.forEach(function (m) { allMonths[m] = true; });
+      }
+    });
+
+    var mock = computeMockForRows_(mockByName[normName_(stu.name)] || []);
+
+    if (!subjects.length && (!mock || !mock.exams.length)) return; // NO_DATA はマップに入れない
+
+    // 欠席率：履修科目すべて（成績の有無に関わらず）について事前ロードのマップから取得
+    var absence = {};
+    if (ABSENCE.ENABLED) {
+      var gTok = absGradeToken_(stu.grade);
+      stu.subjects.forEach(function (s) {
+        var am = absMaps[gTok + '|' + s];
+        var v = am ? am[normName_(stu.name)] : undefined;
+        absence[s] = (v == null ? null : v);
+      });
+    }
+
+    var months = Object.keys(allMonths).sort();
+    out[normName_(stu.name)] = {
+      name: stu.name, grade: stu.grade, homeroom: stu.homeroom,
+      subjects: subjects,
+      months: months,
+      data: data,
+      mock: mock,
+      absence: absence,
+    };
+  });
   return out;
 }
 
-/* 1科目分の演習データを整形（合計点推移 + 分野別月次, 欠測 null）
+/* 1科目分の演習データを整形（合計点推移 + 分野別月次, 欠測 null）— 単体ライブ取得（フォールバック用）。
  * 設計仕様（成績推移）に準拠：TextFinderで対象行を絞り込み、%書式は100倍補正、
- * 未出題（平均得点率<=0）は月次から除外、全期間null分野は除去。               */
+ * 未出題（平均得点率<=0）は月次から除外、全期間null分野は除去。
+ * ※ 通常のスナップショット再計算は loadScoresSheet_ + computeScoresPerSubject_ を使い、
+ *    この関数は使いません（互換のため残置）。                                       */
 function readScoresPerSubject_(name, subjectKey) {
   var sh = getSheet_(CONFIG.SCORES_SPREADSHEET_ID, CONFIG.SCORES_SHEETS[subjectKey]);
   if (!sh) return null;
@@ -376,11 +474,6 @@ function readScoresPerSubject_(name, subjectKey) {
   var fmts = block.getNumberFormats();      // %書式検出用
   var header = sh.getRange(1, 1, 1, lastCol).getValues()[0];
 
-  // 使用する分野リスト：SCORES_FIELDS に定義があればそれ、無ければヘッダーから自動検出
-  var fields = fieldsForSubject_(subjectKey, header);
-  // 分野→列（得点率/平均得点率/偏差値）をヘッダーで特定（無ければ固定オフセット）
-  var fieldDefs = resolveFieldColumns_(fields, header);
-
   // 対象行だけ抽出（minR..maxR の連続ブロックから rowNums のみ）
   var picked = [];
   rowNums.forEach(function (rn) {
@@ -389,7 +482,19 @@ function readScoresPerSubject_(name, subjectKey) {
     if (!date) return;
     picked.push({ rowArr: row, fmtArr: fmts[rn - minR], date: date });
   });
-  picked.sort(function (a, b) { return parseDate_(a.date) - parseDate_(b.date); });
+  return computeScoresPerSubject_(subjectKey, header, picked);
+}
+
+/* 1科目分の演習データ整形の本体。事前ロード済み picked（[{rowArr,fmtArr,date}]）と header から計算。
+ * ライブ取得（readScoresPerSubject_）とスナップショット再計算（buildAllDetails_）の共通ロジック。 */
+function computeScoresPerSubject_(subjectKey, header, picked) {
+  if (!picked || !picked.length) return { fields: [], months: [], totalTrend: [], rate: {}, avgRate: {}, hensachi: {} };
+  picked = picked.slice().sort(function (a, b) { return parseDate_(a.date) - parseDate_(b.date); });
+
+  // 使用する分野リスト：SCORES_FIELDS に定義があればそれ、無ければヘッダーから自動検出
+  var fields = fieldsForSubject_(subjectKey, header);
+  // 分野→列（得点率/平均得点率/偏差値）をヘッダーで特定（無ければ固定オフセット）
+  var fieldDefs = resolveFieldColumns_(fields, header);
 
   // 合計点推移
   var totalTrend = picked.map(function (p) {
@@ -532,7 +637,10 @@ function parseSubjects_(cellVal) {
   return keys;
 }
 
-/* ===================== MOCK (マーク模試フォーム) ===================== */
+/* ===================== MOCK (マーク模試フォーム) =====================
+ * 単体ライブ取得（フォールバック用）。数万行あるため TextFinder で該当行だけ読む。
+ * ※ 通常のスナップショット再計算は loadMockByName_ + computeMockForRows_ を使い、
+ *    この関数は使いません（互換のため残置）。                                       */
 function readMockForStudent_(name) {
   var sh = getSheet_(CONFIG.MOCK_SPREADSHEET_ID, MOCK.SHEET);
   if (!sh) return { exams: [], aspiration: null, aspHistory: [] };
@@ -552,8 +660,16 @@ function readMockForStudent_(name) {
   var minR = Math.min.apply(null, rowNums), maxR = Math.max.apply(null, rowNums);
   var block = sh.getRange(minR, 1, maxR - minR + 1, lastCol).getValues();
   var rows = rowNums.map(function (rn) { return block[rn - minR]; });
+  return computeMockForRows_(rows);
+}
+
+/* マーク模試の行配列（[行配列,...]）から exams / 志望校履歴を構築。
+ * ライブ取得（readMockForStudent_）とスナップショット再計算（buildAllDetails_）の共通ロジック。 */
+function computeMockForRows_(rows) {
+  if (!rows || !rows.length) return { exams: [], aspiration: null, aspHistory: [] };
+  var C = MOCK.COL;
   // フォーム回答はタイムスタンプ昇順が基本だが、念のため日付で並べる
-  rows.sort(function (a, b) {
+  rows = rows.slice().sort(function (a, b) {
     return (mockDate_(a) || 0) - (mockDate_(b) || 0);
   });
 
@@ -734,6 +850,182 @@ function readAbsenceForStudent_(name, gradeToken, subjectKey) {
   }
   return null;
 }
+
+/* ===================== SNAPSHOT 事前計算 =====================
+ * 各ソースシートを「1回だけ」読み、一覧＋全生徒詳細をまとめて計算してキャッシュへ。
+ * これにより、ユーザーのアクセス時は重い計算を一切走らせず（=温まったキャッシュを返すだけ）、
+ * 体感速度が劇的に改善する。30分ごとの時間トリガー rebuildSnapshot から呼ばれるほか、
+ * 「更新」ボタン（fresh=1）やキャッシュ未ヒット時にも呼ばれる。
+ *
+ * 重要な高速化ポイント：
+ *  - マーク模試(約2.9万行)を loadMockByName_ で1回だけ読む（従来の生徒ごと TextFinder を撤廃）
+ *  - 各演習成績シートも loadScoresSheet_ で1回だけ全列読み、メモリ上で生徒別に索引化
+ *  - 欠席率タブも学年×科目ごとに1回だけ読む                                            */
+/* 戻り値: { students, homerooms }。詳細は各 'detail:<normName>' キーへ書き込む（getDetail_ が個別取得）。
+ * 引数 force=true（更新ボタン/トリガー）のときは直近再計算の再利用（プレチェック）を行わず必ず作りに行く。
+ * ★A バッチ書き込み / ★B 二重再計算の防止（鮮度チェック＋ロック）を実装。                       */
+function rebuildAll_(force) {
+  var cache = CacheService.getScriptCache();
+
+  // ★B-1: 非forceは「直近 PRE 秒以内に再計算済み」なら、ロックも取らず再利用（コールド時の集中を吸収）。
+  if (!force) {
+    var pre = recentSnapshot_(cache, REBUILD_DEDUP_PRE_SEC);
+    if (pre) return pre;
+  }
+
+  var lock = LockService.getScriptLock();
+  var have = false;
+  try { have = lock.tryLock(1000); } catch (e) {}
+  if (!have) {
+    // 他の実行が再計算中。完了まで待つ（再計算は数十秒で済む想定）。
+    try { lock.waitLock(300000); have = true; } catch (e) {}
+  }
+
+  try {
+    // ★B-2: ロック保持下で再度鮮度チェック。待っている間に他が作った／「更新」2本同時発火の2本目は
+    //       ここで既存スナップショットを再利用し、二重の全再計算を防ぐ。
+    var snap = recentSnapshot_(cache, REBUILD_DEDUP_POST_SEC);
+    if (snap) return snap;
+
+    var roster = readRoster_(); // [{name,grade,subjects[],homeroom}]
+    if (!roster.length) {
+      cachePutBig_(cache, 'students', JSON.stringify({ students: [], homerooms: [] }), CONFIG.CACHE_NODATA_SEC);
+      setRebuildEpoch_(cache);
+      return { students: [], homerooms: [] };
+    }
+
+    // 履修されている科目だけ、演習成績シートを「丸ごと1回」ロード
+    var usedSubjects = {};
+    roster.forEach(function (r) { r.subjects.forEach(function (s) { usedSubjects[s] = true; }); });
+    var scoresLoaded = {}; // subjectKey -> { header, byName }
+    Object.keys(usedSubjects).forEach(function (s) { scoresLoaded[s] = loadScoresSheet_(s); });
+
+    // マーク模試を1回ロード（normName -> 行配列[]）
+    var mockByName = loadMockByName_();
+
+    // 欠席率マップ（学年|科目ごとに1回）
+    var absMaps = buildAbsenceMapsForRoster_(roster);
+
+    // 一覧 & 全生徒詳細を構築
+    var list = buildStudentsList_(roster, scoresLoaded, absMaps);
+    var details = buildAllDetails_(roster, scoresLoaded, mockByName, absMaps);
+
+    // ★A: 全チャンクを1つの map にまとめ、数回の putAll でまとめ書き（従来は生徒ごとに putAll＝約105往復）。
+    var entries = {};
+    addBigEntries_(entries, 'students', JSON.stringify({ students: list.students, homerooms: list.homerooms }));
+    Object.keys(details).forEach(function (nn) {
+      addBigEntries_(entries, 'detail:' + nn, JSON.stringify({ detail: details[nn] }));
+    });
+    putAllBatched_(cache, entries, CONFIG.CACHE_DETAIL_SEC);
+    setRebuildEpoch_(cache);
+    try {
+      cache.put('snapshot_meta', JSON.stringify({
+        at: Utilities.formatDate(new Date(), TZ, 'yyyy/MM/dd HH:mm:ss'),
+        students: list.students.length, details: Object.keys(details).length,
+      }), CONFIG.CACHE_DETAIL_SEC);
+    } catch (e) {}
+
+    return { students: list.students, homerooms: list.homerooms };
+  } finally {
+    if (have) { try { lock.releaseLock(); } catch (e) {} }
+  }
+}
+
+/* 直近 withinSec 秒以内に再計算済みなら、キャッシュ上のスナップショット {students,homerooms} を返す。*/
+function recentSnapshot_(cache, withinSec) {
+  var ep = rebuildEpoch_(cache);
+  if (!ep || (Date.now() - ep) > withinSec * 1000) return null;
+  var sHit = cacheGetBig_(cache, 'students');
+  if (!sHit) return null;
+  var s = safeParse_(sHit);
+  if (!s) return null;
+  return { students: s.students || [], homerooms: s.homerooms || [] };
+}
+function rebuildEpoch_(cache) { var v = cache.get('rebuild_epoch'); return v ? (parseInt(v, 10) || 0) : 0; }
+function setRebuildEpoch_(cache) { try { cache.put('rebuild_epoch', String(Date.now()), CONFIG.CACHE_DETAIL_SEC); } catch (e) {} }
+
+/* 公開トリガー関数：GAS エディタで時間主導トリガーに割り当てる（30分ごと推奨）。
+ * セルフテスト用に手動実行も可。実行ログに所要時間と件数を出す。                      */
+function rebuildSnapshot() {
+  var t0 = Date.now();
+  var res = rebuildAll_(true);
+  var ms = Date.now() - t0;
+  var meta = CacheService.getScriptCache().get('snapshot_meta');
+  Logger.log('rebuildSnapshot: students=%s, %sms, meta=%s', (res.students || []).length, ms, meta);
+  return res;
+}
+
+/* 一度だけ実行：rebuildSnapshot を30分ごとに走らせる時間主導トリガーを作成（重複作成は防止）。*/
+function setupSnapshotTrigger() {
+  var exists = ScriptApp.getProjectTriggers().some(function (t) {
+    return t.getHandlerFunction() === 'rebuildSnapshot';
+  });
+  if (exists) { Logger.log('既に rebuildSnapshot トリガーがあります（作成しません）。'); return; }
+  ScriptApp.newTrigger('rebuildSnapshot').timeBased().everyMinutes(30).create();
+  Logger.log('rebuildSnapshot トリガーを30分ごとで作成しました。初回ウォームアップを実行します…');
+  rebuildSnapshot();
+}
+
+/* rebuildSnapshot トリガーを全削除（間隔変更ややり直し用）。*/
+function removeSnapshotTriggers() {
+  var n = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'rebuildSnapshot') { ScriptApp.deleteTrigger(t); n++; }
+  });
+  Logger.log('削除した rebuildSnapshot トリガー: %s 個', n);
+}
+
+/* ── チャンク対応キャッシュ（CacheService は1値100KB上限のため分割保存）──────────
+ *  cachePutBig_/cacheGetBig_ は <key>:meta（チャンク数）と <key>:0,<key>:1… に分けて保存・復元。*/
+var CACHE_CHUNK_ = 95000; // 文字数/チャンク（100KB上限の安全側）
+// ★B 二重再計算の防止に使う鮮度ウィンドウ（秒）
+var REBUILD_DEDUP_PRE_SEC = 25;  // 非force：直近この秒数なら再計算せず再利用（コールド時の集中アクセス対策）
+var REBUILD_DEDUP_POST_SEC = 12; // ロック取得後：この秒数なら再利用（「更新」2本同時発火/トリガー重複の2本目）
+
+/* 1論理キーを meta＋チャンクに展開して into に積む（★A バッチ書き込み用）。*/
+function addBigEntries_(into, key, str) {
+  var n = Math.max(1, Math.ceil(str.length / CACHE_CHUNK_));
+  into[key + ':meta'] = JSON.stringify({ n: n, len: str.length });
+  for (var i = 0; i < n; i++) into[key + ':' + i] = str.substr(i * CACHE_CHUNK_, CACHE_CHUNK_);
+}
+/* 多数のキーを putAll で「まとめ書き」。1回あたり 最大40キー / 約400KB に分割（putAll上限の安全側）。*/
+function putAllBatched_(cache, entries, ttl) {
+  var keys = Object.keys(entries);
+  var batch = {}, cnt = 0, bytes = 0;
+  function flush() { if (cnt > 0) { try { cache.putAll(batch, ttl); } catch (e) {} batch = {}; cnt = 0; bytes = 0; } }
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i], v = entries[k], vb = v ? v.length : 0;
+    if (cnt >= 40 || (bytes + vb) > 400000) flush();
+    batch[k] = v; cnt++; bytes += vb;
+  }
+  flush();
+}
+function cachePutBig_(cache, key, str, ttl) {
+  try {
+    var n = Math.max(1, Math.ceil(str.length / CACHE_CHUNK_));
+    var puts = {};
+    puts[key + ':meta'] = JSON.stringify({ n: n, len: str.length });
+    for (var i = 0; i < n; i++) puts[key + ':' + i] = str.substr(i * CACHE_CHUNK_, CACHE_CHUNK_);
+    cache.putAll(puts, ttl);
+  } catch (e) { /* 上限超過などは黙ってスキップ（次回 rebuild で再試行）*/ }
+}
+function cacheGetBig_(cache, key) {
+  var meta = cache.get(key + ':meta');
+  if (!meta) return null;
+  var n;
+  try { n = JSON.parse(meta).n; } catch (e) { return null; }
+  var keys = [];
+  for (var i = 0; i < n; i++) keys.push(key + ':' + i);
+  var got = cache.getAll(keys);
+  var s = '';
+  for (var j = 0; j < n; j++) {
+    var c = got[key + ':' + j];
+    if (c == null) return null; // 一部チャンク失効 → 取り直し扱い
+    s += c;
+  }
+  return s;
+}
+function safeParse_(s) { try { return JSON.parse(s); } catch (e) { return null; } }
 
 /* ===================== helpers ===================== */
 function getSheet_(ssId, sheetName) {

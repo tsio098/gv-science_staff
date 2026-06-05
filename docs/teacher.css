@@ -472,6 +472,12 @@ body {
   .mk-table th, .mk-table td { padding: 2px 4px !important; }
   .mk-subj { max-width: 70px !important; }
 
+  /* 模試の行が多い場合の B4 1枚対策：表は「新しい順」で描画されているため、先頭から
+     最大14行（最新14回）だけ表示し、それより古い行（15行目以降）は印刷時に隠す。
+     ※ もし合計点/分野別グラフが2枚目に押し出される場合は、この 15（=最新14行）を
+        小さい数字にしてください（例: n+13 なら最新12行）。逆に1枚に余裕があれば増やせます。 */
+  .mk-table tbody tr:nth-child(n+15) { display: none !important; }
+
   /* 科目セクション：枠線/余白を削り、合計点(左・狭め)＋分野別(右・広め)を横並びに。
      分野別を広めにして、得点傾向の2カラム（得意/苦手）が折り返さない幅を確保する。 */
   .tw-subject-section { border-top: none !important; margin: 0 !important; padding: 0 !important; }
