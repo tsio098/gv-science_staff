@@ -162,31 +162,81 @@ const Icon = {
   ),
 };
 
-// Logo mark — the crab mascot (recolored to burnt orange so it matches the
-// brand accent). We default to a small soft-sage rounded square that holds
-// the orange crab cutout — sage + orange = the brand complementary pair.
+// Crab mascot — self-contained inline SVG（外部画像に依存しない）。
+// バーントオレンジでブランドアクセントに合わせた蟹。
+function CrabSVG({ size = 22 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ display: 'block' }} aria-hidden="true">
+      <defs>
+        <linearGradient id="gvCrabGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#FF9A4E" />
+          <stop offset="1" stopColor="#F26B1D" />
+        </linearGradient>
+      </defs>
+      <g fill="url(#gvCrabGrad)">
+        {/* 脚（左右3本ずつ）*/}
+        <path d="M7.6 14.6 4.1 15.7 3.8 14.4 6.9 13.4Z" />
+        <path d="M7.7 16 4.6 17.7 4.1 16.6 6.9 15Z" />
+        <path d="M8 17.2 5.6 19.2 4.9 18.2 7.4 16.4Z" />
+        <path d="M16.4 14.6 19.9 15.7 20.2 14.4 17.1 13.4Z" />
+        <path d="M16.3 16 19.4 17.7 19.9 16.6 17.1 15Z" />
+        <path d="M16 17.2 18.4 19.2 19.1 18.2 16.6 16.4Z" />
+        {/* ハサミの腕 */}
+        <path d="M7.2 11.3C5.2 10.4 4 8.9 4.2 7.4" stroke="url(#gvCrabGrad)" strokeWidth="1.7" strokeLinecap="round" fill="none" />
+        <path d="M16.8 11.3C18.8 10.4 20 8.9 19.8 7.4" stroke="url(#gvCrabGrad)" strokeWidth="1.7" strokeLinecap="round" fill="none" />
+        {/* ハサミ（左右のはさみ）*/}
+        <path d="M4.3 4.5c1.4-.2 2.6.8 2.7 2.2.05.9-.4 1.6-1.2 1.8.3-.55.05-1.25-.6-1.5.15.7-.25 1.35-.95 1.5-1 .2-2-.45-2.2-1.55-.2-1.1.6-2.2 2.25-2.45Z" />
+        <path d="M19.7 4.5c-1.4-.2-2.6.8-2.7 2.2-.05.9.4 1.6 1.2 1.8-.3-.55-.05-1.25.6-1.5-.15.7.25 1.35.95 1.5 1 .2 2-.45 2.2-1.55.2-1.1-.6-2.2-2.25-2.45Z" />
+        {/* 甲羅（本体）*/}
+        <path d="M5.5 13.1c0-3.4 2.8-5.4 6.5-5.4s6.5 2 6.5 5.4c0 2.7-2.9 4.6-6.5 4.6s-6.5-1.9-6.5-4.6Z" />
+      </g>
+      {/* 目 */}
+      <circle cx="9.9" cy="11.3" r="1.05" fill="#73340F" />
+      <circle cx="14.1" cy="11.3" r="1.05" fill="#73340F" />
+      <circle cx="9.6" cy="11.0" r="0.34" fill="#fff" />
+      <circle cx="13.8" cy="11.0" r="0.34" fill="#fff" />
+    </svg>
+  );
+}
+
+// 蟹画像（PNG）。assets/crab-cutout-orange.png が無い場合は上の CrabSVG に自動フォールバック。
+const CRAB_PNG = 'assets/crab-cutout-orange.png';
+function CrabImg({ size, round = 0 }) {
+  // 画像が読めなければ <img> を隠し、SVG を表示する（崩れ防止）。
+  const [failed, setFailed] = React.useState(false);
+  if (failed) return <CrabSVG size={size} />;
+  return (
+    <img
+      src={CRAB_PNG}
+      width={size} height={size}
+      onError={() => setFailed(true)}
+      style={{ display: 'block', objectFit: 'contain', borderRadius: round || undefined }}
+      alt=""
+    />
+  );
+}
+
+// Logo mark — クリーム色の角丸バッジに蟹（PNG）を収めた既定形（badge）。
 function LogoMark({ size = 28, variant = 'badge' }) {
   if (variant === 'plain') {
-    return (
-      <img
-        src="assets/crab-cutout-orange.png"
-        width={size} height={size}
-        style={{ display: 'block', objectFit: 'contain' }}
-        alt="GV Science"
-      />
-    );
+    return <CrabImg size={size} />;
   }
   if (variant === 'app-icon') {
     return (
-      <img
-        src="assets/crab-orange.png"
-        width={size} height={size}
-        style={{ display: 'block', borderRadius: size * 0.22 }}
-        alt="GV Science"
-      />
+      <div
+        aria-hidden="true"
+        style={{
+          width: size, height: size, borderRadius: size * 0.22,
+          background: 'linear-gradient(135deg, #FFFFFF 0%, #F4EFE6 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          overflow: 'hidden', flexShrink: 0,
+        }}
+      >
+        <CrabImg size={Math.round(size * 0.82)} />
+      </div>
     );
   }
-  // Default 'badge': soft cream square holding the orange crab cutout.
+  // Default 'badge': soft cream square holding the orange crab.
   return (
     <div
       aria-hidden="true"
@@ -200,12 +250,7 @@ function LogoMark({ size = 28, variant = 'badge' }) {
         overflow: 'hidden', flexShrink: 0,
       }}
     >
-      <img
-        src="assets/crab-cutout-orange.png"
-        width={Math.round(size * 0.82)} height={Math.round(size * 0.82)}
-        style={{ display: 'block', objectFit: 'contain' }}
-        alt=""
-      />
+      <CrabImg size={Math.round(size * 0.82)} />
     </div>
   );
 }
