@@ -469,14 +469,37 @@ body {
   .mk-card { margin: 0 0 4mm !important; padding: 8px 10px !important; break-inside: avoid; box-shadow: none !important; }
   .mk-tablewrap { overflow: visible !important; }
   .mk-table { font-size: 8px !important; }
-  .mk-table th, .mk-table td { padding: 2px 4px !important; }
+  .mk-table th, .mk-table td { padding: 1px 4px !important; }
   .mk-subj { max-width: 70px !important; }
 
-  /* 模試の行が多い場合の B4 1枚対策：表は「新しい順」で描画されているため、先頭から
-     最大14行（最新14回）だけ表示し、それより古い行（15行目以降）は印刷時に隠す。
-     ※ もし合計点/分野別グラフが2枚目に押し出される場合は、この 15（=最新14行）を
-        小さい数字にしてください（例: n+13 なら最新12行）。逆に1枚に余裕があれば増やせます。 */
-  .mk-table tbody tr:nth-child(n+15) { display: none !important; }
+  /* ── B4・1枚に確実に収めるためのコンパクト化 ────────────────────────────
+     実測：無対策だと本文の高さ≈892px ＞ 1ページの印刷可能高≈918px の“ギリギリ”で、
+     わずかなレンダリング差で合計点/分野別グラフが2枚目に押し出されていた。
+     下の圧縮で本文≈777pxまで下げ、約140pxの余裕を確保している。               */
+
+  /* 見出し・ヘッダーを少し詰める */
+  .tw-detail-title { font-size: 16px !important; }
+  .tw-detail-head { margin-bottom: 2mm !important; }
+
+  /* 模試カード上部（志望校ボックス＋直近/自己ベスト）を圧縮 */
+  .mk-card { padding: 6px 9px !important; }
+  .mk-top { gap: 8px !important; margin: 0 0 4px !important; }
+  .mk-asp { padding: 6px 10px !important; }
+  .mk-asp-k { font-size: 9px !important; }
+  .mk-asp-v { font-size: 13px !important; margin-top: 1px !important; }
+  .mk-asp-hist { font-size: 8px !important; margin-top: 2px !important; }
+  .mk-sum { padding: 5px 10px !important; }
+  .mk-sum-k { font-size: 9px !important; }
+  .mk-sum-v { font-size: 15px !important; }
+
+  /* 科目セクションのカード見出し・サマリーも少し詰める */
+  .gt-card-title { font-size: 12px !important; }
+  .gt-summary { margin: 2px 0 5px !important; }
+
+  /* 模試の行が多い場合の保険：表は「新しい順」描画なので、先頭から最大12行
+     （最新12回）だけ表示し、13行目以降（古い行）は隠す。1枚に収まらない時は
+     この 13（=最新12行）を小さくする／余裕があれば増やす。 */
+  .mk-table tbody tr:nth-child(n+13) { display: none !important; }
 
   /* 科目セクション：枠線/余白を削り、合計点(左・狭め)＋分野別(右・広め)を横並びに。
      分野別を広めにして、得点傾向の2カラム（得意/苦手）が折り返さない幅を確保する。 */
