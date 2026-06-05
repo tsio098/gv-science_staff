@@ -13,13 +13,19 @@
    global: React, monthShort, dateShort */
 
 // ── nice rounded axis bounds ──────────────────────────────
-function bounds(values, padFrac = 0.12, step = 5) {
+// clamp = { lo, hi } を渡すと、目盛りの最小/最大をその範囲内に収める（例: 0〜100）。
+function bounds(values, padFrac = 0.12, step = 5, clamp = null) {
   const vs = values.filter(v => v != null);
-  if (!vs.length) return { min: 0, max: step };
+  if (!vs.length) return clamp ? { min: clamp.lo, max: clamp.hi } : { min: 0, max: step };
   const lo = Math.min(...vs), hi = Math.max(...vs);
   const span = Math.max(hi - lo, step);
   let min = Math.floor((lo - span * padFrac) / step) * step;
   let max = Math.ceil((hi + span * padFrac) / step) * step;
+  if (clamp) {
+    min = Math.max(clamp.lo, min);
+    max = Math.min(clamp.hi, max);
+    if (max <= min) { min = Math.max(clamp.lo, Math.min(min, clamp.hi - step)); max = Math.min(clamp.hi, min + step); }
+  }
   if (min === max) max = min + step;
   return { min, max };
 }
@@ -81,7 +87,7 @@ function TotalTrendChart({ points, width }) {
   const n = points.length;
 
   const scoreVals = points.flatMap(p => [p.total, p.avg]);
-  const sB = bounds(scoreVals, 0.14, 5);
+  const sB = bounds(scoreVals, 0.14, 5, { lo: 0, hi: 100 }); // 左軸（点）は 0〜100 に収める
   const hB = bounds(points.map(p => p.hensachi), 0.16, 5);
 
   const X = (i) => padL + (n === 1 ? iW / 2 : iW * i / (n - 1));
@@ -242,6 +248,83 @@ function FieldLineChart({ months, series, unit = '%', width, yFixed }) {
   );
 }
 
+// ════════════════════════════════════════════════════════════
+//  FieldMultiChart — 分野別の推移を「合計点グラフと同じ形」で表示。
+//  選択した各分野について、得点率(実線)・平均得点率(破線)を左軸(%, 0〜100)、
+//  偏差値(細線)を右軸に重ねる。線の色＝分野。欠測月(null)は詰めて連続線(§7-2)。
+//  fields: [{ name, color, rate:[], avgRate:[], hensachi:[] }]（各配列は months と同長）
+// ════════════════════════════════════════════════════════════
+function FieldMultiChart({ months, fields, width }) {
+  const W = width;
+  const H = Math.round(clampN(W * 0.46, 190, 300));
+  const padL = 34, padR = 40, padT = 16, padB = 28;
+  const iW = W - padL - padR, iH = H - padT - padB;
+
+  // どれかの分野で値がある月だけを軸に残す（和集合・昇順）
+  const activeIdx = months
+    .map((_, i) => i)
+    .filter(i => fields.some(f => f.rate[i] != null || f.avgRate[i] != null || f.hensachi[i] != null));
+  const K = activeIdx.length;
+  const xLabels = activeIdx.map(i => months[i]);
+
+  const pctVals = fields.flatMap(f => [...f.rate, ...f.avgRate]);
+  const pB = bounds(pctVals, 0.10, 5, { lo: 0, hi: 100 });           // 左軸：得点率/平均得点率（0〜100）
+  const hVals = fields.flatMap(f => f.hensachi);
+  const hB = bounds(hVals.length ? hVals : [40, 60], 0.16, 5);       // 右軸：偏差値
+
+  const X = (p) => padL + (K <= 1 ? iW / 2 : iW * p / (K - 1));
+  const Yp = (v) => padT + iH * (1 - (v - pB.min) / (pB.max - pB.min));
+  const Yh = (v) => padT + iH * (1 - (v - hB.min) / (hB.max - hB.min));
+  const pT = ticks(pB.min, pB.max, 4);
+  const hT = ticks(hB.min, hB.max, 4);
+
+  // 値がある軸ポジションだけを直結（欠測は飛ばす）
+  const lineFor = (vals, Y) => {
+    const pts = activeIdx.map((i, p) => (vals[i] != null ? { p, v: vals[i] } : null)).filter(Boolean);
+    return { d: pts.map((pt, k) => `${k ? 'L' : 'M'}${X(pt.p).toFixed(1)} ${Y(pt.v).toFixed(1)}`).join(' '), pts };
+  };
+
+  return (
+    <svg className="gt-chart" width="100%" height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="分野別の推移グラフ（得点率・平均得点率・偏差値）">
+      {pT.map((t, i) => (
+        <g key={`g${i}`}>
+          <line x1={padL} y1={Yp(t)} x2={padL + iW} y2={Yp(t)} stroke="var(--c-divider)" strokeWidth="1" opacity="0.7" />
+          <text x={padL - 7} y={Yp(t) + 3.5} textAnchor="end" className="gt-axis">{t}</text>
+        </g>
+      ))}
+      {hT.map((t, i) => (
+        <text key={`h${i}`} x={padL + iW + 7} y={Yh(t) + 3.5} textAnchor="start" className="gt-axis gt-axis-acc">{t}</text>
+      ))}
+      {xLabels.map((m, p) => (
+        <text key={`x${p}`} x={X(p)} y={H - 8} textAnchor="middle" className="gt-axis">{monthShort(m)}</text>
+      ))}
+
+      {fields.length === 0 && (
+        <text x={W / 2} y={H / 2} textAnchor="middle" className="gt-axis" style={{ fontSize: 12 }}>分野を選択してください</text>
+      )}
+      {fields.length > 0 && K === 0 && (
+        <text x={W / 2} y={H / 2} textAnchor="middle" className="gt-axis" style={{ fontSize: 12 }}>データがありません</text>
+      )}
+
+      {fields.map((f) => {
+        const rate = lineFor(f.rate, Yp);
+        const avg = lineFor(f.avgRate, Yp);
+        const hen = lineFor(f.hensachi, Yh);
+        return (
+          <g key={f.name}>
+            {hen.d && <path d={hen.d} fill="none" stroke={f.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.38" />}
+            {avg.d && <path d={avg.d} fill="none" stroke={f.color} strokeWidth="1.6" strokeDasharray="3 3" strokeLinecap="round" opacity="0.7" />}
+            {rate.d && <path d={rate.d} fill="none" stroke={f.color} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />}
+            {rate.pts.map((pt, k) => (
+              <circle key={k} cx={X(pt.p)} cy={Yp(pt.v)} r="2.8" fill="#fff" stroke={f.color} strokeWidth="1.7" />
+            ))}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 // ── ClassHistogram — 偏差値 distribution across the cohort (クラス俯瞰) ──
 function ClassHistogram({ values, width, highlight }) {
   const W = width;
@@ -291,4 +374,4 @@ function ClassHistogram({ values, width, highlight }) {
 
 function clampN(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-Object.assign(window, { Measured, MiniSparkline, TotalTrendChart, FieldLineChart, ClassHistogram });
+Object.assign(window, { Measured, MiniSparkline, TotalTrendChart, FieldLineChart, FieldMultiChart, ClassHistogram });

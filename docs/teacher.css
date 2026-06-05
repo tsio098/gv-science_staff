@@ -430,6 +430,44 @@ body {
 .tw-subject-section { margin-top: 6px; padding-top: 20px; border-top: 1px solid var(--c-divider); }
 .tw-subject-eyebrow { margin: 0 0 10px; }
 
+/* 詳細トップのツールバー（戻る ＋ PDF出力ボタン）*/
+.tw-detail-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.gv-print-bar { display: flex; gap: 8px; }
+.gv-print-btn {
+  font: inherit; font-size: 12px; font-weight: 600;
+  padding: 6px 14px; border-radius: 999px;
+  border: 0.5px solid var(--c-divider); background: var(--c-surface); color: var(--c-text-sub);
+  cursor: pointer; white-space: nowrap;
+}
+.gv-print-btn:hover { background: var(--c-bg-warm); color: var(--c-text); }
+
+/* ════════════════════════════════════════════════════════
+   印刷 / PDF出力（B4）。操作系UIを隠し、レポートとして整形。
+   @page の用紙サイズ・向きは printB4() が動的に注入。
+   ════════════════════════════════════════════════════════ */
+@media print {
+  /* 操作・ナビ系を隠す */
+  .tw-header, .tw-detail-topbar, .gv-print-bar, .tw-back,
+  .gt-vchips, .gt-presets, .gt-range, .gt-fieldchips,
+  .gt-seg, .tw-subjtabs, .gt-gapnote { display: none !important; }
+
+  html, body, .gv-root, .tw-frame, .tw-main, .tw-detail { background: #fff !important; }
+  .tw-frame { padding: 0 !important; }
+  .tw-main.tw-detail { max-width: none !important; padding: 0 !important; }
+
+  /* カードは途中で切らない／影は消す */
+  .gt-card, .mk-card, .tw-subject-section { break-inside: avoid; page-break-inside: avoid; box-shadow: none !important; }
+  .gt-card { margin-bottom: 6mm !important; border: 0.5px solid var(--c-divider) !important; }
+
+  /* スクロール領域は全部見せる */
+  .gt-scroll { max-height: none !important; overflow: visible !important; }
+  .mk-tablewrap { overflow: visible !important; }
+  .tw-detail-grid { display: block !important; }
+
+  /* 印刷で色を保持 */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}
+
 /* 詳細は常に縦積み（カードを上下に並べる）。横幅は画面に合わせて広げる。 */
 .tw-detail-grid { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
 

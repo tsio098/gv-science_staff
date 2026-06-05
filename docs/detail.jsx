@@ -215,6 +215,16 @@ function MockExamCard({ det }) {
 
 }
 
+// 詳細画面を B4（縦/横）でPDF化。ブラウザの印刷ダイアログで「PDFに保存」を選ぶ。
+function printB4(orientation) {
+  const land = orientation === 'landscape';
+  let st = document.getElementById('gv-print-page');
+  if (!st) { st = document.createElement('style'); st.id = 'gv-print-page'; document.head.appendChild(st); }
+  st.textContent = '@page { size: B4 ' + (land ? 'landscape' : 'portrait') + '; margin: 8mm; }';
+  document.documentElement.setAttribute('data-print-orient', land ? 'landscape' : 'portrait');
+  setTimeout(() => window.print(), 40);
+}
+
 function StudentDetailScreen({ nav, name, state = 'normal' }) {
   const det = DETAIL[name];
   const subjects = det ? det.subjects : [];
@@ -243,7 +253,7 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
   // ── 分野別 ──
   const curMetric = METRICS.find((m) => m.key === metric);
   const order = d.fields.filter((f) => sel.has(f));
-  const series = order.map((f) => ({ name: f, color: colorForField(det, subject, f), values: d[metric][f] }));
+  const fieldSeries = order.map((f) => ({ name: f, color: colorForField(det, subject, f), rate: d.rate[f], avgRate: d.avgRate[f], hensachi: d.hensachi[f] }));
   const toggleField = (f) => setSel((s) => {const n = new Set(s);n.has(f) ? n.delete(f) : n.add(f);return n;});
 
   // ── 得点傾向（得意/苦手）— 平均得点率は除外 ──
@@ -295,7 +305,13 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
 
   return (
     <div className="tw-main tw-detail">
-      <button className="tw-back" onClick={() => nav('back')}>{Icon.chevL(14)} 一覧へ戻る</button>
+      <div className="tw-detail-topbar">
+        <button className="tw-back" onClick={() => nav('back')}>{Icon.chevL(14)} 一覧へ戻る</button>
+        <div className="gv-print-bar">
+          <button className="gv-print-btn" onClick={() => printB4('portrait')}>PDF（B4縦）</button>
+          <button className="gv-print-btn" onClick={() => printB4('landscape')}>PDF（B4横）</button>
+        </div>
+      </div>
       <div className="tw-detail-head">
         <div>
           <div className="tw-eyebrow">REPORT · 成績推移</div>
@@ -404,12 +420,6 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
             )}
           </div>
 
-          <div className="gt-seg gt-seg-sm">
-            {METRICS.filter((m) => fv === 'lines' || m.key !== 'avgRate').map((m) =>
-            <button key={m.key} className={`gt-seg-btn ${m.key === (fv === 'strengths' ? swMetricKey : metric) ? 'on' : ''}`} onClick={() => setMetric(m.key)}>{m.label}</button>
-            )}
-          </div>
-
           {fv === 'lines' &&
           <>
               <div className="gt-presets">
@@ -418,11 +428,17 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
                 <button className="gt-preset" onClick={() => setSel(new Set())}>クリア</button>
                 <span className="gt-presets-count gv-num">{sel.size}/{d.fields.length}</span>
               </div>
-              <Measured h={210}>{(w) => <FieldLineChart months={months} series={series} unit={curMetric.unit} width={w} />}</Measured>
+              <Measured h={220}>{(w) => <FieldMultiChart months={months} fields={fieldSeries} width={w} />}</Measured>
+              <div className="gt-legend">
+                <span className="gt-leg"><span style={{ display: 'inline-block', width: 16, borderTop: '2.6px solid var(--c-text-sub)', marginRight: 6, verticalAlign: 'middle' }} />得点率</span>
+                <span className="gt-leg"><span style={{ display: 'inline-block', width: 16, borderTop: '2px dashed var(--c-text-sub)', marginRight: 6, verticalAlign: 'middle' }} />平均得点率</span>
+                <span className="gt-leg"><span style={{ display: 'inline-block', width: 16, borderTop: '1.5px solid var(--c-text-mute)', marginRight: 6, verticalAlign: 'middle' }} />偏差値 <span className="gv-en" style={{ opacity: .6 }}>(右軸)</span></span>
+                <span className="gt-leg" style={{ color: 'var(--c-text-mute)' }}>線の色＝分野</span>
+              </div>
               <div className="gt-fieldchips">
                 {d.fields.map((f) => {
                 const on = sel.has(f);const c = colorForField(det, subject, f);
-                const hasData = d[metric][f].some((v) => v != null);
+                const hasData = d.rate[f].some((v) => v != null);
                 return (
                   <button key={f} className={`gt-fchip ${on ? 'on' : ''}`} onClick={() => toggleField(f)}
                   style={on ? { borderColor: c, color: c, background: c + '14' } : hasData ? undefined : { opacity: 0.5 }}>
@@ -462,7 +478,13 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
           }
 
           {fv === 'strengths' &&
-          <div className="tw-sw-grid">
+          <>
+            <div className="gt-seg gt-seg-sm">
+              {METRICS.filter((m) => m.key !== 'avgRate').map((m) =>
+              <button key={m.key} className={`gt-seg-btn ${m.key === swMetricKey ? 'on' : ''}`} onClick={() => setMetric(m.key)}>{m.label}</button>
+              )}
+            </div>
+            <div className="tw-sw-grid">
               <div className="gt-sw-col">
                 <div className="gt-sw-h"><span className="gt-sw-badge strong">得意</span>直近の上位{cnt}</div>
                 {strong.map(({ f, v, prev }) =>
@@ -486,6 +508,7 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
               )}
               </div>
             </div>
+            </>
           }
           {fv === 'strengths' &&
           <div className="gt-note gt-note-soft" style={{ marginTop: 14 }}>得点傾向は「直近の値がある月」で判定。平均得点率はクラス難易度の指標のため、この表示では除外しています。</div>
