@@ -59,21 +59,21 @@ function AuthScreen({ variant, onSubmit }) {
       <div className="tw-auth-card">
         <div className="tw-auth-brand"><Logo size={30} /></div>
         <div className={`tw-auth-ic ${err ? 'err' : ''}`}>{err ? Icon.alert(24) : Icon.qr(24)}</div>
-        <div className="tw-auth-t1">{err ? 'アクセスが確認できません' : '先生用ダッシュボード'}</div>
+        <div className="tw-auth-t1">{err ? 'パスワードが違います' : '先生用ダッシュボード'}</div>
         <div className="tw-auth-t2">
           {err
-            ? 'リンクのトークンが無効か期限切れです。配布された最新のURLからアクセスするか、下にトークンを入力してください。'
-            : '配布されたトークン付きURLからアクセスすると、自動でログインします。トークンをお持ちの場合は下に入力してください。'}
+            ? 'パスワードが一致しませんでした。もう一度入力してください。'
+            : 'このダッシュボードを開くにはパスワードが必要です。下に入力してください。'}
         </div>
         <form className="tw-auth-field" onSubmit={submit}>
-          <label className="tw-auth-label">アクセストークン</label>
-          <input className="tw-auth-input" value={token} onChange={(e) => setToken(e.target.value)} placeholder="例：gv-2026-xxxxxxxx" autoComplete="off" autoFocus />
-          {err && <div className="tw-auth-err">{Icon.alert(14)}<span>トークンが一致しませんでした。</span></div>}
+          <label className="tw-auth-label">パスワード</label>
+          <input className="tw-auth-input" type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="パスワードを入力" autoComplete="current-password" autoFocus />
+          {err && <div className="tw-auth-err">{Icon.alert(14)}<span>パスワードが一致しませんでした。</span></div>}
           <button className="btn btn-primary btn-full" type="submit" style={{ marginTop: 16 }}>ダッシュボードを開く</button>
         </form>
         <div className="tw-auth-note">
           {Icon.info(15)}
-          <span>これは限定配布リンクによる簡易認証です。トークンはタブを閉じると破棄されます。アクセスできない場合は管理者にご連絡ください。</span>
+          <span>パスワードはタブを閉じると破棄されます。アクセスできない場合は管理者にご連絡ください。</span>
         </div>
       </div>
     </div>
@@ -137,7 +137,12 @@ function App() {
   const route = useHashRoute();
   const [query, setQuery] = React.useState('');
   const [refreshKey, setRefreshKey] = React.useState(0);
-  const [authed, setAuthed] = React.useState(() => GVApi.hasToken());
+  const [authed, setAuthed] = React.useState(() => {
+    // 認証ONのときは、保存済み/URL由来のトークンも ACCESS_TOKEN と一致する場合のみ通す
+    const cfg = window.GV_CONFIG || {};
+    if (cfg.AUTH_ENABLED && cfg.ACCESS_TOKEN) return GVApi.getToken() === cfg.ACCESS_TOKEN;
+    return GVApi.hasToken();
+  });
   const [authError, setAuthError] = React.useState(false);
   const [listState, setListState] = React.useState('loading'); // loading|normal|empty|error
   const [detState, setDetState] = React.useState('loading');
@@ -209,7 +214,11 @@ function App() {
   if (!authed) {
     return (
       <div className="gv-root tw-root dens-regular">
-        <AuthScreen variant={authError ? 'error' : 'token'} onSubmit={(tok) => { GVApi.setToken(tok); setAuthError(false); setAuthed(true); freshRef.current = true; setRefreshKey((k) => k + 1); }} />
+        <AuthScreen variant={authError ? 'error' : 'token'} onSubmit={(tok) => {
+          const expected = (window.GV_CONFIG && window.GV_CONFIG.ACCESS_TOKEN) || '';
+          if (expected && tok !== expected) { setAuthError(true); GVApi.clearToken(); return; }
+          GVApi.setToken(tok); setAuthError(false); setAuthed(true); freshRef.current = true; setRefreshKey((k) => k + 1);
+        }} />
       </div>
     );
   }

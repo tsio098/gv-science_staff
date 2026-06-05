@@ -333,6 +333,7 @@ ROSTER.forEach((r) => {
   const perSubject = {};
   let lastExam = null;
   let worstDelta = 0;
+  let declining = false;
   r.subjects.forEach((s) => {
     const tt = data[s].totalTrend;
     const last = tt[tt.length - 1];
@@ -352,6 +353,8 @@ ROSTER.forEach((r) => {
     const d = new Date(last.date.replace(/\//g, '-'));
     if (!lastExam || d > lastExam) lastExam = d;
     if (dHen < worstDelta) worstDelta = dHen;
+    // 2回連続で偏差値が下降（直近3テストが単調減少）
+    if (tt.length >= 3 && tt[tt.length - 1].hensachi < tt[tt.length - 2].hensachi && tt[tt.length - 2].hensachi < tt[tt.length - 3].hensachi) declining = true;
   });
   const daysSince = lastExam ? daysBetween(lastExam, TODAY) : 999;
 
@@ -364,7 +367,7 @@ ROSTER.forEach((r) => {
     lastExamDate: lastExam ? `${lastExam.getFullYear()}/${String(lastExam.getMonth() + 1).padStart(2, '0')}/${String(lastExam.getDate()).padStart(2, '0')}` : null,
     daysSince,
     flags: {
-      declining: worstDelta <= -3,        // 偏差値が大きく下降
+      declining: declining,               // 偏差値が2回連続で下降
       stale: daysSince >= 30,             // 長期間未受験
     },
     worstDelta,

@@ -14,10 +14,13 @@ window.GV_CONFIG = {
   // GAS ウェブアプリの /exec URL（未設定だと「サンプルデータ」で起動します）
   GAS_ENDPOINT: 'https://script.google.com/macros/s/AKfycbyMq1ej9Tun-Olt4u88Jip2ZLWDAZFbRsO3vp9GskmPTzOnLXH-rmvDfGulIxw-eq9O/exec',
 
-  // 認証：false なら「URL を知っていれば誰でも閲覧可」（トークン入力画面を出さない）。
-  //   あとでトークン制限を掛けるときは true にし、GAS 側 CONFIG.AUTH_ENABLED も true に、
-  //   配布URLに ?token=... を付ける運用に切り替えてください。GAS の ACCESS_TOKEN と一致が必要。
-  AUTH_ENABLED: false,
+  // 認証：true で、アプリを開く前に「パスワード入力」を必須にする。
+  //   入力値が下の ACCESS_TOKEN と一致したときだけダッシュボードを開く。
+  //   ※ これはフロント側の簡易ゲートです（公開リポジトリではコードから読めるため機密ではありません）。
+  AUTH_ENABLED: true,
+
+  // 開くために必要なパスワード（トークン）。
+  ACCESS_TOKEN: 'great098',
 
   // sessionStorage / クエリで使うトークンのキー名（通常は変更不要）
   TOKEN_PARAM: 'token',

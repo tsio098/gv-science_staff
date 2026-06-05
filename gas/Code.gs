@@ -52,7 +52,9 @@ var CONFIG = {
   CACHE_NODATA_SEC:   60,      // データ無しは短く
 
   // 一覧の「要注目」判定
-  FLAG_DECLINING_DELTA: -3,    // 偏差値の前回比がこれ以下で「下降」
+  // 「下降」フラグ＝いずれかの科目で偏差値が2回連続で下降（直近3テストが単調減少）。
+  // ※ FLAG_DECLINING_DELTA は現在フラグ判定には未使用（並べ替え「落ち込み順」は worstDelta を使用）。
+  FLAG_DECLINING_DELTA: -3,
   FLAG_STALE_DAYS:      30,    // 最終受験からこの日数以上で「長期未受験」
 };
 
@@ -221,7 +223,7 @@ function getStudents_(fresh) {
   var today = new Date();
   var students = roster.map(function (r) {
     var perSubject = {};
-    var lastExam = null, worstDelta = 0;
+    var lastExam = null, worstDelta = 0, declining = false;
     r.subjects.forEach(function (s) {
       var rows = (index[s] && index[s][normName_(r.name)]) || [];
       rows.sort(byDateAsc_);
@@ -244,6 +246,11 @@ function getStudents_(fresh) {
       var d = parseDate_(last.date);
       if (d && (!lastExam || d > lastExam)) lastExam = d;
       if (dHen < worstDelta) worstDelta = dHen;
+      // 「2回連続で偏差値が下がった」科目があれば下降フラグ（直近3テストの偏差値が単調減少）
+      if (rows.length >= 3) {
+        var h1 = rows[rows.length - 3].hensachi, h2 = rows[rows.length - 2].hensachi, h3 = rows[rows.length - 1].hensachi;
+        if (h3 < h2 && h2 < h1) declining = true;
+      }
     });
 
     // 集計対象の科目（成績が実在するものだけ）
@@ -259,7 +266,7 @@ function getStudents_(fresh) {
       lastExamDate: lastExam ? fmtDate_(lastExam) : null,
       daysSince: daysSince,
       flags: {
-        declining: worstDelta <= CONFIG.FLAG_DECLINING_DELTA,
+        declining: declining, // いずれかの科目で偏差値が2回連続で下降
         stale: daysSince != null && daysSince >= CONFIG.FLAG_STALE_DAYS,
       },
       worstDelta: worstDelta,
