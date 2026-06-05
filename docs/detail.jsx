@@ -105,9 +105,9 @@ function MockExamCard({ det }) {
   const mock = det.mock;
   if (!mock || !mock.exams.length) {
     return (
-      <div className="gt-card mk-card">
+      <div className="gt-card mk-card" style={{ margin: '0 0 30px' }}>
         <div className="gt-card-head">
-          <div className="gt-card-title">全国一斉模試<span className="gt-card-title-sub">共通テスト型</span></div>
+          <div className="gt-card-title">模試の成績推移<span className="gt-card-title-sub">共通テスト型マーク模試</span></div>
         </div>
         <div className="gt-note gt-note-soft">マーク模試の記録がまだありません。</div>
       </div>);
@@ -315,8 +315,11 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
 
       <MockExamCard det={det} />
 
+      {/* 科目別の成績推移セクション（科目タブ＋合計点/分野別カードを1グループとして見せる）*/}
+      <div className="tw-subject-section">
+        <div className="tw-eyebrow tw-subject-eyebrow">科目別の成績推移</div>
       {/* 科目タブ */}
-      <div className={subjectUI === 'segmented' ? 'gt-seg' : 'tw-subjtabs'} style={subjectUI === 'segmented' ? { maxWidth: 360, marginBottom: 18 } : undefined} role="tablist">
+      <div className={subjectUI === 'segmented' ? 'gt-seg' : 'tw-subjtabs'} style={subjectUI === 'segmented' ? { maxWidth: 360, marginBottom: 12 } : { marginBottom: 12 }} role="tablist">
         {subjects.map((s) =>
         subjectUI === 'segmented' ?
         <button key={s} role="tab" aria-selected={s === subject} className={`gt-seg-btn ${s === subject ? 'on' : ''}`} onClick={() => setSubject(s)}>{SUBJECT_META[s].label}</button> :
@@ -488,6 +491,7 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
           <div className="gt-note gt-note-soft" style={{ marginTop: 14 }}>得点傾向は「直近の値がある月」で判定。平均得点率はクラス難易度の指標のため、この表示では除外しています。</div>
           }
         </div>
+      </div>
       </div>
     </div>);
 

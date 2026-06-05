@@ -426,6 +426,10 @@ body {
 
 .tw-subjtabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
 
+/* 科目別セクション：模試カードから離し、科目タブ＋合計点/分野別カードを1グループに見せる */
+.tw-subject-section { margin-top: 6px; padding-top: 20px; border-top: 1px solid var(--c-divider); }
+.tw-subject-eyebrow { margin: 0 0 10px; }
+
 /* 詳細は常に縦積み（カードを上下に並べる）。横幅は画面に合わせて広げる。 */
 .tw-detail-grid { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
 

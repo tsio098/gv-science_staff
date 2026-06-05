@@ -657,17 +657,26 @@ function resolveAbsenceSheet_(gradeToken, label) {
   return null;
 }
 
-/* 欠席率タブの 生徒名列 / 欠席率列（1始まり）をヘッダーから特定。*/
+/* 欠席率タブの ヘッダー行 / 生徒名列 / 欠席率列（いずれも1始まり）を特定。
+ * ヘッダーが1行目とは限らない（実シートは日付などが先頭にあり、3行目が見出し）。
+ * そのため先頭から最大 ABS_HEADER_SCAN 行を走査し、「生徒名」「欠席率」の両方を
+ * 含む最初の行をヘッダー行として採用する。見つからなければ headerRow:0 を返す。*/
+var ABS_HEADER_SCAN = 12;
 function absCols_(sh) {
   var lastCol = sh.getLastColumn();
-  var header = sh.getRange(1, 1, 1, lastCol).getValues()[0];
-  var nameCol = 0, rateCol = 0;
-  for (var i = 0; i < header.length; i++) {
-    var h = String(header[i] || '').trim();
-    if (h === ABSENCE.STUDENT_HEADER) nameCol = i + 1;
-    if (h === ABSENCE.RATE_HEADER) rateCol = i + 1;
+  var scanRows = Math.min(sh.getLastRow(), ABS_HEADER_SCAN);
+  if (scanRows < 1 || lastCol < 1) return { headerRow: 0, nameCol: 0, rateCol: 0, lastCol: lastCol };
+  var grid = sh.getRange(1, 1, scanRows, lastCol).getValues();
+  for (var r = 0; r < scanRows; r++) {
+    var nameCol = 0, rateCol = 0;
+    for (var i = 0; i < grid[r].length; i++) {
+      var h = String(grid[r][i] || '').trim();
+      if (h === ABSENCE.STUDENT_HEADER) nameCol = i + 1;
+      if (h === ABSENCE.RATE_HEADER) rateCol = i + 1;
+    }
+    if (nameCol && rateCol) return { headerRow: r + 1, nameCol: nameCol, rateCol: rateCol, lastCol: lastCol };
   }
-  return { nameCol: nameCol, rateCol: rateCol, lastCol: lastCol };
+  return { headerRow: 0, nameCol: 0, rateCol: 0, lastCol: lastCol };
 }
 
 /* 1学年×1科目タブを読み、normName → 欠席率(%) のマップを返す（一覧用・まとめ読み）。*/
@@ -677,11 +686,12 @@ function readAbsenceMap_(gradeToken, subjectKey) {
   if (!label) return {};
   var sh = resolveAbsenceSheet_(gradeToken, label);
   if (!sh) return {};
-  var lastRow = sh.getLastRow();
-  if (lastRow < 2) return {};
   var c = absCols_(sh);
-  if (!c.nameCol || !c.rateCol) return {};
-  var vals = sh.getRange(2, 1, lastRow - 1, c.lastCol).getValues();
+  if (!c.headerRow || !c.nameCol || !c.rateCol) return {};
+  var lastRow = sh.getLastRow();
+  var firstData = c.headerRow + 1;
+  if (lastRow < firstData) return {};
+  var vals = sh.getRange(firstData, 1, lastRow - firstData + 1, c.lastCol).getValues();
   var map = {};
   vals.forEach(function (r) {
     var nm = String(r[c.nameCol - 1] || '').trim();
@@ -700,14 +710,15 @@ function readAbsenceForStudent_(name, gradeToken, subjectKey) {
   if (!label) return null;
   var sh = resolveAbsenceSheet_(gradeToken, label);
   if (!sh) return null;
-  var lastRow = sh.getLastRow();
-  if (lastRow < 2) return null;
   var c = absCols_(sh);
-  if (!c.nameCol || !c.rateCol) return null;
-  var hits = sh.getRange(1, c.nameCol, lastRow, 1).createTextFinder(name).matchEntireCell(true).findAll();
+  if (!c.headerRow || !c.nameCol || !c.rateCol) return null;
+  var lastRow = sh.getLastRow();
+  var firstData = c.headerRow + 1;
+  if (lastRow < firstData) return null;
+  var hits = sh.getRange(firstData, c.nameCol, lastRow - firstData + 1, 1).createTextFinder(name).matchEntireCell(true).findAll();
   for (var j = 0; j < hits.length; j++) {
     var rn = hits[j].getRow();
-    if (rn < 2) continue;
+    if (rn < firstData) continue;
     if (normName_(hits[j].getValue()) === normName_(name)) {
       var v = sh.getRange(rn, c.rateCol).getValue();
       if (v === '' || v == null) return null;
