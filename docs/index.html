@@ -9,31 +9,34 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-<link rel="stylesheet" href="styles.css" />
-<link rel="stylesheet" href="gradetrend.css" />
-<link rel="stylesheet" href="teacher.css" />
+<!-- ★ キャッシュ対策：内容を更新したら下の v=… の番号を必ず上げてください（全アセット共通）。
+     これでブラウザ／GitHub Pages のキャッシュを確実に無効化し、最新が即反映されます。 -->
+<link rel="stylesheet" href="styles.css?v=20260605c" />
+<link rel="stylesheet" href="gradetrend.css?v=20260605c" />
+<link rel="stylesheet" href="teacher.css?v=20260605c" />
 </head>
 <body>
 
 <div id="root"></div>
 
-<!-- React + Babel ─────────────────────────────────────────────────────── -->
+<!-- React（Babelは廃止：JSXは事前コンパイル済みの dist/*.js を読み込む＝起動が高速）──── -->
 <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 
-<!-- 設定・定数・データ取得層（プレーンJS：Babel変換前に実行される）──────── -->
-<script src="config.js"></script>
-<script src="constants.js"></script>
-<script src="sample-data.js"></script>
-<script src="api.js"></script>
+<!-- 設定・定数・データ取得層（プレーンJS）──────────────────────────────── -->
+<script src="config.js?v=20260605c"></script>
+<script src="constants.js?v=20260605c"></script>
+<script src="sample-data.js?v=20260605c"></script>
+<script src="api.js?v=20260605c"></script>
 
-<!-- アイコン・チャート・画面・シェル（JSX）───────────────────────────────── -->
-<script type="text/babel" src="icons.jsx"></script>
-<script type="text/babel" src="charts.jsx"></script>
-<script type="text/babel" src="list.jsx"></script>
-<script type="text/babel" src="detail.jsx"></script>
-<script type="text/babel" src="app.jsx"></script>
+<!-- アイコン・チャート・画面・シェル（JSXを事前コンパイルした dist/*.js）────────
+     ※ docs/*.jsx を編集したら docs/build.sh を実行して dist/*.js を作り直し、
+        上の v=… 番号を上げてから push してください（手順は build.sh 冒頭に記載）。 -->
+<script src="dist/icons.js?v=20260605c"></script>
+<script src="dist/charts.js?v=20260605c"></script>
+<script src="dist/list.js?v=20260605c"></script>
+<script src="dist/detail.js?v=20260605c"></script>
+<script src="dist/app.js?v=20260605c"></script>
 
 </body>
 </html>
