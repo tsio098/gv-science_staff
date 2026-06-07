@@ -182,7 +182,17 @@ function App() {
     const fresh = freshRef.current;
     setListState((s) => (window.STUDENTS && window.STUDENTS.length ? s : 'loading'));
     GVApi.fetchStudents({ fresh, onRevalidate: (f) => { if (alive) applyStudents(f); } })
-      .then((res) => { if (alive) applyStudents(res); })
+      .then((res) => {
+        if (!alive) return;
+        applyStudents(res);
+        // ★即表示＋裏で最新化：自動/ログイン(非fresh)で即表示したら、裏で最新(fresh)を取り直して反映。
+        //   30分トリガー由来の≤30分鮮度を即出しつつ、最新入力も少し遅れて反映される。
+        if (!fresh && res.status === 'ok') {
+          GVApi.fetchStudents({ fresh: true })
+            .then((f) => { if (alive && f.status === 'ok') applyStudents(f); })
+            .catch(() => {});
+        }
+      })
       .catch(() => { if (alive) setListState('error'); });
     return () => { alive = false; };
   }, [authed, refreshKey, noConfig]);
@@ -217,7 +227,7 @@ function App() {
         <AuthScreen variant={authError ? 'error' : 'token'} onSubmit={(tok) => {
           const expected = (window.GV_CONFIG && window.GV_CONFIG.ACCESS_TOKEN) || '';
           if (expected && tok !== expected) { setAuthError(true); GVApi.clearToken(); return; }
-          GVApi.setToken(tok); setAuthError(false); setAuthed(true); freshRef.current = true; setRefreshKey((k) => k + 1);
+          GVApi.setToken(tok); setAuthError(false); setAuthed(true); setRefreshKey((k) => k + 1);
         }} />
       </div>
     );

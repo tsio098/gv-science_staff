@@ -252,7 +252,15 @@ function App() {
         if (alive) applyStudents(f);
       }
     }).then(res => {
-      if (alive) applyStudents(res);
+      if (!alive) return;
+      applyStudents(res);
+      if (!fresh && res.status === 'ok') {
+        GVApi.fetchStudents({
+          fresh: true
+        }).then(f => {
+          if (alive && f.status === 'ok') applyStudents(f);
+        }).catch(() => {});
+      }
     }).catch(() => {
       if (alive) setListState('error');
     });
@@ -319,7 +327,6 @@ function App() {
         GVApi.setToken(tok);
         setAuthError(false);
         setAuthed(true);
-        freshRef.current = true;
         setRefreshKey(k => k + 1);
       }
     }));

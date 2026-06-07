@@ -87,6 +87,10 @@ var ROSTER = {
 var MOCK = {
   SHEET: 'マーク模試(フォーム)', // 実シート名（☆試験成績報告（回答）の先頭タブ）
   HEADER_ROWS: 1,
+  // ★ 今年度（4/1）以降の回答だけ読む高速化。A列タイムスタンプは昇順（下が最新）。
+  //   true: 今年度開始(4/1)以降の行だけをテール読み（過去年度の模試は詳細に出ません）。
+  //   false: 従来どおり全行（約2.9万行）を読む。
+  LIMIT_TO_FISCAL_YEAR: true,
   // 実ヘッダー（1始まり）：1 タイムスタンプ / 2 試験名 / 3 生徒ID / 4 姓 / 5 名 / 6 名前 /
   //   7 合計 / 8 学年 / 9 志望校(旧) / 10 志望校(新) / 11 国現 / 12 国古 / 13 国漢 / 14 国合計 /
   //   15 英R / 16 英L / 17 英合計 / 18 ⅠA / 19 ⅡBC /
@@ -152,6 +156,13 @@ var ABSENCE = {
   SUBJECT_LABEL: { chemistry: '化学', biology: '生物', chem_basics: '化学基礎', bio_basics: '生物基礎', earth_basics: '地学基礎' },
   STUDENT_HEADER: '生徒名',
   RATE_HEADER: '欠席率',
+  // ★全タブ共通の固定レイアウト（FIXED:true なら先頭12行×全列のヘッダー自動検出をスキップして高速化）。
+  //   実シート：生徒名=B列(2) / 欠席率=E列(5) / データは4行目から（見出しは3行目）。
+  //   レイアウトが変わったら下を直すか、FIXED:false で自動検出に戻せます。
+  FIXED: true,
+  NAME_COL: 2,        // B列
+  RATE_COL: 5,        // E列
+  DATA_START_ROW: 4,  // データ開始行
 };
 
 /* 各科目の分野（順序固定）。演習シートの分野列を特定するために使用。
@@ -199,11 +210,26 @@ function json_(obj) {
  * キャッシュが無い／fresh=1（更新ボタン）のときだけ rebuildAll_ で全再計算する。   */
 function getStudents_(fresh) {
   var cache = CacheService.getScriptCache();
-  if (!fresh) {
-    var hit = cacheGetBig_(cache, 'students');
-    if (hit) { try { return JSON.parse(hit); } catch (e) {} }
+  if (fresh) {
+    // 「更新」ボタン（明示操作）：一覧＋全詳細を作り直す。数秒かかってよい。
+    var resF = rebuildAll_(true);
+    return { students: resF.students, homerooms: resF.homerooms };
   }
-  var res = rebuildAll_(fresh);
+  // 通常アクセス：温まったキャッシュ(L1=CacheService)を即返す。
+  var hit = cacheGetBig_(cache, 'students');
+  if (hit) { try { return JSON.parse(hit); } catch (e) {} }
+  // ★L2=永続スナップショット(ScriptProperties)。CacheService は数分で揮発するため、
+  //   ミス時はここから即返す（再計算ゼロ＝約0.1秒）。鮮度はトリガー間隔(30分)で決まる。
+  var persisted = loadStudentsProp_(CONFIG.CACHE_STUDENTS_SEC);
+  if (persisted) {
+    var pp = safeParse_(persisted);
+    if (pp && pp.students) {
+      try { cachePutBig_(cache, 'students', persisted, CONFIG.CACHE_STUDENTS_SEC); } catch (e) {} // L1 を温め直す
+      return { students: pp.students || [], homerooms: pp.homerooms || [] };
+    }
+  }
+  // ★L1/L2 とも無ければ rebuildAll_（重い全再計算）には落とさず、一覧だけ軽量再計算する（数秒）。
+  var res = rebuildStudentsList_();
   return { students: res.students, homerooms: res.homerooms };
 }
 
@@ -276,18 +302,80 @@ function buildStudentsList_(roster, scoresLoaded, absMaps) {
   return { students: students, homerooms: homerooms };
 }
 
-/* roster 全体で必要な「学年トークン|科目」欠席率マップを、各タブ1回読みで構築。*/
+/* roster 全体で必要な「学年トークン|科目」欠席率マップを構築。
+ *  ★高速化：Google Sheets API（高度なサービス）の batchGet で、全タブの B列(生徒名)/E列(欠席率) を
+ *    まとめて1回のHTTPで取得する（従来は1タブ3往復×10タブ＝約14秒 → 約2秒）。
+ *    サービス未有効時は従来の per-tab 読み（readAbsenceMap_）にフォールバックする。*/
 function buildAbsenceMapsForRoster_(roster) {
   var absMaps = {}; // "gradeToken|subjectKey" -> { normName -> rate }
   if (!ABSENCE.ENABLED) return absMaps;
+
+  // 1) 必要な (gradeToken|subjectKey) → 実タブ名 を解決（重複排除）
+  var jobs = []; // {key, sheetName}
+  var seen = {};
   roster.forEach(function (r) {
     var g = absGradeToken_(r.grade);
     r.subjects.forEach(function (s) {
-      var k = g + '|' + s;
-      if (!(k in absMaps)) absMaps[k] = readAbsenceMap_(g, s);
+      var key = g + '|' + s;
+      if (seen[key]) return; seen[key] = true;
+      var label = ABSENCE.SUBJECT_LABEL[s];
+      if (!label) { absMaps[key] = {}; return; }
+      var sh = resolveAbsenceSheet_(g, label);
+      if (!sh) { absMaps[key] = {}; return; }
+      jobs.push({ key: key, sheetName: sh.getName() });
     });
   });
+  if (!jobs.length) return absMaps;
+
+  // 2) Sheets API batchGet（高度なサービス Sheets が有効なら一括取得）
+  var t0 = Date.now();
+  if (typeof Sheets !== 'undefined' && Sheets.Spreadsheets && Sheets.Spreadsheets.Values) {
+    try {
+      var nameA1 = colLetter_(ABSENCE.NAME_COL), rateA1 = colLetter_(ABSENCE.RATE_COL);
+      var start = ABSENCE.DATA_START_ROW;
+      var ranges = [];
+      jobs.forEach(function (j) {
+        var t = "'" + String(j.sheetName).replace(/'/g, "''") + "'";
+        ranges.push(t + '!' + nameA1 + start + ':' + nameA1); // 生徒名列（4行目以降）
+        ranges.push(t + '!' + rateA1 + start + ':' + rateA1); // 欠席率列（4行目以降）
+      });
+      var resp = Sheets.Spreadsheets.Values.batchGet(ABSENCE.SPREADSHEET_ID, { ranges: ranges });
+      var vr = (resp && resp.valueRanges) || [];
+      for (var i = 0; i < jobs.length; i++) {
+        var names = (vr[i * 2] && vr[i * 2].values) || [];
+        var rates = (vr[i * 2 + 1] && vr[i * 2 + 1].values) || [];
+        var map = {};
+        var n = Math.max(names.length, rates.length);
+        for (var d = 0; d < n; d++) {
+          var nm = String((names[d] && names[d][0]) || '').trim();
+          if (!nm) continue;
+          var v = rates[d] ? rates[d][0] : null;
+          if (v === '' || v == null) continue;
+          map[normName_(nm)] = round1_(num_(v));
+        }
+        absMaps[jobs[i].key] = map;
+      }
+      Logger.log('ABS batchGet: tabs=%s, %sms', jobs.length, (Date.now() - t0));
+      return absMaps;
+    } catch (e) {
+      Logger.log('ABS batchGet 失敗→フォールバック: %s', (e && e.message) || e);
+    }
+  }
+
+  // 3) フォールバック：従来の per-tab 読み（Sheets API 未有効化／失敗時）
+  jobs.forEach(function (j) {
+    var p = j.key.split('|');
+    absMaps[j.key] = readAbsenceMap_(p[0], p[1]);
+  });
+  Logger.log('ABS per-tab(fallback): tabs=%s, %sms', jobs.length, (Date.now() - t0));
   return absMaps;
+}
+
+/* 列番号(1始まり)→A1の列記号（2→"B", 5→"E", 27→"AA"）。*/
+function colLetter_(col) {
+  var s = '';
+  while (col > 0) { var m = (col - 1) % 26; s = String.fromCharCode(65 + m) + s; col = Math.floor((col - 1) / 26); }
+  return s || 'A';
 }
 
 /* 事前ロード行（[{rowArr,fmtArr,date}]）→ 一覧用 [{date,total,avg,hensachi}] */
@@ -321,14 +409,149 @@ function loadScoresSheet_(subjectKey) {
   return { header: header, byName: byName };
 }
 
-/* マーク模試シート(約2.9万行)を「丸ごと1回」読み、normName→[行配列] を返す（rebuildAll_ 用）。*/
+/* ★高速化（案1a＋案3）：履修されている全演習成績シートを「Sheets API batchGet」で一括取得する。
+ *  5科目シートは同一スプレッドシート内なので、従来の per-sheet 読み
+ *    （openById×5 ＋ getLastRow/Col×10 ＋ getValues/getNumberFormats×10 ≈ 25往復）
+ *  を HTTP2回に集約する：
+ *    ① 値：UNFORMATTED_VALUE ＋ 日付は FORMATTED_STRING（数値は完全精度・日付は文字列）
+ *    ② 表示：FORMATTED_VALUE（"85%" を含む列を percent と判定＝getNumberFormats の代替）
+ *  下流（computeScoresPerSubject_/readNum_）が使う {header, byName:[{rowArr,fmtArr,date}]} 構造を
+ *  そのまま再現するので無改変。Sheets 未有効化／例外時は従来の per-sheet 読みへ自動フォールバック。*/
+function loadScoresForSubjects_(subjectKeys) {
+  try {
+    if (typeof Sheets !== 'undefined' && Sheets.Spreadsheets && Sheets.Spreadsheets.Values) {
+      var fast = loadScoresViaSheetsApi_(subjectKeys);
+      if (fast) return fast;
+    }
+  } catch (e) {
+    Logger.log('SCORES batchGet 失敗→フォールバック: %s', (e && e.message) || e);
+  }
+  var out = {};
+  subjectKeys.forEach(function (s) { out[s] = loadScoresSheet_(s); });
+  Logger.log('SCORES per-sheet(fallback): sheets=%s', subjectKeys.length);
+  return out;
+}
+
+function loadScoresViaSheetsApi_(subjectKeys) {
+  var t0 = Date.now();
+  var ssId = CONFIG.SCORES_SPREADSHEET_ID;
+  var keys = [], ranges = [];
+  (subjectKeys || []).forEach(function (s) {
+    var nm = CONFIG.SCORES_SHEETS[s];
+    if (!nm) return;
+    keys.push(s);
+    ranges.push("'" + String(nm).replace(/'/g, "''") + "'");
+  });
+  if (!keys.length) return {};
+
+  // ① 値（数値=完全精度、日付=文字列）
+  var respU = Sheets.Spreadsheets.Values.batchGet(ssId, {
+    ranges: ranges,
+    valueRenderOption: 'UNFORMATTED_VALUE',
+    dateTimeRenderOption: 'FORMATTED_STRING'
+  });
+  // ② 表示文字列（%列検出・日付フォールバック用）
+  var respF = Sheets.Spreadsheets.Values.batchGet(ssId, {
+    ranges: ranges,
+    valueRenderOption: 'FORMATTED_VALUE',
+    dateTimeRenderOption: 'FORMATTED_STRING'
+  });
+  var vrU = respU.valueRanges || [];
+  var vrF = respF.valueRanges || [];
+
+  var out = {};
+  for (var i = 0; i < keys.length; i++) {
+    var valsU = (vrU[i] && vrU[i].values) || [];
+    var valsF = (vrF[i] && vrF[i].values) || [];
+    out[keys[i]] = buildScoresByName_(valsU, valsF);
+  }
+  Logger.log('SCORES batchGet: sheets=%s, %sms', keys.length, (Date.now() - t0));
+  return out;
+}
+
+/* batchGet の値配列（U=数値, F=表示）から {header, byName} を作る。loadScoresSheet_ と同型を返す。
+ *  %判定：表示文字列に '%' を含む列は percent（列単位で一様）。readNum_ 互換の fmt 行を全行で共有。*/
+function buildScoresByName_(valsU, valsF) {
+  if (!valsU.length) return { header: [], byName: {} };
+  var header = (valsF[0] || valsU[0] || []);
+  var maxCol = 0;
+  [valsU, valsF].forEach(function (vs) {
+    for (var r = 0; r < vs.length; r++) { if (vs[r] && vs[r].length > maxCol) maxCol = vs[r].length; }
+  });
+  // 表示文字列に '%' を含む列を percent とみなす（列一様）。
+  var fmtRow = new Array(maxCol);
+  for (var c = 0; c < maxCol; c++) fmtRow[c] = '';
+  for (var rr = 1; rr < valsF.length; rr++) {
+    var fr = valsF[rr]; if (!fr) continue;
+    for (var cc = 0; cc < fr.length; cc++) {
+      if (fmtRow[cc] !== '%' && typeof fr[cc] === 'string' && fr[cc].indexOf('%') >= 0) fmtRow[cc] = '%';
+    }
+  }
+  var byName = {};
+  for (var r2 = 1; r2 < valsU.length; r2++) {
+    var row = valsU[r2] || [];
+    var nm = String(row[0] || '').trim();
+    if (!nm) continue;
+    var fr2 = valsF[r2] || [];
+    var date = fmtAny_(fr2[2] != null ? fr2[2] : row[2]); // 日付列(3列目)は表示文字列優先
+    if (!date) continue;
+    var key = normName_(nm);
+    (byName[key] || (byName[key] = [])).push({ rowArr: row, fmtArr: fmtRow, date: date });
+  }
+  return { header: header, byName: byName };
+}
+
+/* 今年度（4/1）開始時刻の ms(絶対時刻) を返す。スクリプトTZの「今日」で年度を判定（1〜3月は前年4/1）。
+ *  本プロジェクトのTZは Asia/Tokyo（JST=+09:00・DSTなし）。GASランタイムTZに依存しないよう
+ *  UTC基準から固定オフセットで 4/1 00:00 JST を算出する。*/
+function fiscalYearStartMs_() {
+  var now = new Date();
+  var y = Number(Utilities.formatDate(now, TZ, 'yyyy'));
+  var m = Number(Utilities.formatDate(now, TZ, 'MM'));
+  var fyStartYear = (m >= 4) ? y : (y - 1);
+  // 4/1 00:00:00 JST = 3/31 15:00:00 UTC
+  return Date.UTC(fyStartYear, 3, 1, 0, 0, 0) - 9 * 3600 * 1000;
+}
+
+/* セル値（Date / 文字列）→ ms。判定不能は null。getValues は日時セルを Date で返す。*/
+function tsToMs_(v) {
+  if (v == null || v === '') return null;
+  if (v instanceof Date) return v.getTime();
+  var d = parseDate_(String(v));
+  return d ? d.getTime() : null;
+}
+
+/* マーク模試シートで「今年度(4/1)以降」の最初のデータ行(1始まり)を返す。
+ *  A列タイムスタンプ列だけ（1列）を読んで cutoff 以上の先頭行を線形探索する。全列(30列)読みより遥かに軽い。
+ *  末尾に空行/書式だけの行があっても取りこぼさないよう、末尾スライスではなく全行を堅牢に走査する。
+ *  今年度の行が無ければ lastRow+1。LIMIT 無効時は先頭データ行。*/
+function mockDataStartRow_(sh, lastRow) {
+  var firstData = MOCK.HEADER_ROWS + 1;
+  if (!MOCK.LIMIT_TO_FISCAL_YEAR) return firstData;
+  var n = lastRow - MOCK.HEADER_ROWS;
+  if (n <= 0) return firstData;
+  var cutoff = fiscalYearStartMs_();
+  if (!cutoff) return firstData;
+  var tsVals = sh.getRange(firstData, MOCK.COL.timestamp, n, 1).getValues();
+  for (var i = 0; i < n; i++) {
+    var ms = tsToMs_(tsVals[i][0]);
+    if (ms != null && ms >= cutoff) return firstData + i; // 昇順なので以降は全て今年度
+  }
+  return lastRow + 1; // 今年度の行が無い
+}
+
+/* マーク模試シート(約2.9万行)を読み、normName→[行配列] を返す（rebuildAll_ 用）。
+ * ★ MOCK.LIMIT_TO_FISCAL_YEAR=true のときは「今年度(4/1)以降」の行だけをテール読みする。*/
 function loadMockByName_() {
   var out = {};
   var sh = getSheet_(CONFIG.MOCK_SPREADSHEET_ID, MOCK.SHEET);
   if (!sh) return out;
   var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
   if (lastRow <= MOCK.HEADER_ROWS || lastCol < 1) return out;
-  var vals = sh.getRange(MOCK.HEADER_ROWS + 1, 1, lastRow - MOCK.HEADER_ROWS, lastCol).getValues();
+  // ★ 今年度(4/1)以降だけを読む：A列は昇順なので、cutoff以上になる先頭行から末尾までを1回読み。
+  var startRow = mockDataStartRow_(sh, lastRow);
+  if (startRow > lastRow) return out; // 今年度の回答が無い
+  var vals = sh.getRange(startRow, 1, lastRow - startRow + 1, lastCol).getValues();
   var nameIdx = MOCK.COL.studentName - 1;
   for (var i = 0; i < vals.length; i++) {
     var row = vals[i];
@@ -648,12 +871,15 @@ function readMockForStudent_(name) {
   if (lastRow <= MOCK.HEADER_ROWS) return { exams: [], aspiration: null, aspHistory: [] };
   var C = MOCK.COL;
 
+  // ★ 今年度(4/1)以降だけを対象に。A列は昇順なので cutoff 以上の先頭行から下だけを検索範囲にする。
+  var startRow = mockDataStartRow_(sh, lastRow);
+  if (startRow > lastRow) return { exams: [], aspiration: null, aspHistory: [] };
   // この回答シートは数万行あるため、名前列を TextFinder で絞り込み、該当行だけ読む。
-  var nameCol = sh.getRange(1, C.studentName, lastRow, 1);
+  var nameCol = sh.getRange(startRow, C.studentName, lastRow - startRow + 1, 1);
   var hits = nameCol.createTextFinder(name).matchEntireCell(true).findAll();
   var rowNums = [];
   hits.forEach(function (rng) {
-    if (rng.getRow() > MOCK.HEADER_ROWS && normName_(rng.getValue()) === normName_(name)) rowNums.push(rng.getRow());
+    if (rng.getRow() >= startRow && normName_(rng.getValue()) === normName_(name)) rowNums.push(rng.getRow());
   });
   if (!rowNums.length) return { exams: [], aspiration: null, aspHistory: [] };
 
@@ -763,19 +989,28 @@ function absSpreadsheet_() {
   return _absSS_;
 }
 
+/* ★高速化：欠席率スプレッドシートの「シート名→Sheet」マップを1回だけ構築してメモ化。
+ *  従来は (学年×科目) ごとに getSheetByName 失敗時 getSheets() を呼び直し、呼び出しが積み上がっていた。*/
+var _absSheets_ = undefined;
+function absSheetMap_() {
+  if (_absSheets_ !== undefined) return _absSheets_;
+  _absSheets_ = {};
+  var ss = absSpreadsheet_();
+  if (ss) { ss.getSheets().forEach(function (s) { _absSheets_[s.getName()] = s; }); }
+  return _absSheets_;
+}
+
 /* 「<学年トークン> <科目ラベル>」タブを解決。完全名→空白区切りトークン一致 の順。
  * 科目ラベルの部分一致（化学 と 化学基礎）を避けるため、トークン完全一致で判定する。*/
 function resolveAbsenceSheet_(gradeToken, label) {
-  var ss = absSpreadsheet_();
-  if (!ss) return null;
-  var sh = ss.getSheetByName(gradeToken + ' ' + label) || ss.getSheetByName(gradeToken + '　' + label);
-  if (sh) return sh;
+  var map = absSheetMap_();
+  if (map[gradeToken + ' ' + label]) return map[gradeToken + ' ' + label];
+  if (map[gradeToken + '　' + label]) return map[gradeToken + '　' + label];
   // フォールバック：半角/全角スペース区切りのトークンに「学年」と「科目ラベル」が両方あるタブ。
-  // 科目ラベルはトークン完全一致（化学 と 化学基礎 の誤マッチ防止）。
-  var sheets = ss.getSheets();
-  for (var i = 0; i < sheets.length; i++) {
-    var toks = sheets[i].getName().split(/[\s　]+/);
-    if (toks.indexOf(gradeToken) >= 0 && toks.indexOf(label) >= 0) return sheets[i];
+  var names = Object.keys(map);
+  for (var i = 0; i < names.length; i++) {
+    var toks = names[i].split(/[\s　]+/);
+    if (toks.indexOf(gradeToken) >= 0 && toks.indexOf(label) >= 0) return map[names[i]];
   }
   return null;
 }
@@ -802,27 +1037,43 @@ function absCols_(sh) {
   return { headerRow: 0, nameCol: 0, rateCol: 0, lastCol: lastCol };
 }
 
-/* 1学年×1科目タブを読み、normName → 欠席率(%) のマップを返す（一覧用・まとめ読み）。*/
+/* 1学年×1科目タブを読み、normName → 欠席率(%) のマップを返す（一覧用・まとめ読み）。
+ * ★高速化：getLastRow/getLastColumn/getRange を個別に呼ばず、getDataRange().getValues() の1回読みで
+ *   ヘッダー検出〜データ抽出まで行う（API呼び出し回数を削減）。*/
+/* タブの「データ開始行 / 生徒名列 / 欠席率列」（いずれも1始まり）を返す。
+ *  ABSENCE.FIXED=true なら固定設定を即返す（ヘッダースキャン無し＝高速）。
+ *  そうでなければ absCols_ による自動検出にフォールバック。失敗時は null。*/
+function absLayout_(sh) {
+  if (ABSENCE.FIXED) {
+    return { dataStart: ABSENCE.DATA_START_ROW, nameCol: ABSENCE.NAME_COL, rateCol: ABSENCE.RATE_COL };
+  }
+  var c = absCols_(sh);
+  if (!c.headerRow || !c.nameCol || !c.rateCol) return null;
+  return { dataStart: c.headerRow + 1, nameCol: c.nameCol, rateCol: c.rateCol };
+}
+
 function readAbsenceMap_(gradeToken, subjectKey) {
   if (!ABSENCE.ENABLED) return {};
   var label = ABSENCE.SUBJECT_LABEL[subjectKey];
   if (!label) return {};
   var sh = resolveAbsenceSheet_(gradeToken, label);
   if (!sh) return {};
-  var c = absCols_(sh);
-  if (!c.headerRow || !c.nameCol || !c.rateCol) return {};
+  var L = absLayout_(sh);
+  if (!L) return {};
   var lastRow = sh.getLastRow();
-  var firstData = c.headerRow + 1;
-  if (lastRow < firstData) return {};
-  var vals = sh.getRange(firstData, 1, lastRow - firstData + 1, c.lastCol).getValues();
+  if (lastRow < L.dataStart) return {};
+  // ★高速化の肝：日次出席グリッド全列は読まず、生徒名列(B)と欠席率列(E)の“細い1列ずつ”だけ読む。
+  var dataRows = lastRow - L.dataStart + 1;
+  var names = sh.getRange(L.dataStart, L.nameCol, dataRows, 1).getValues();
+  var rates = sh.getRange(L.dataStart, L.rateCol, dataRows, 1).getValues();
   var map = {};
-  vals.forEach(function (r) {
-    var nm = String(r[c.nameCol - 1] || '').trim();
-    if (!nm) return;
-    var v = r[c.rateCol - 1];
-    if (v === '' || v == null) return;
+  for (var d = 0; d < dataRows; d++) {
+    var nm = String(names[d][0] || '').trim();
+    if (!nm) continue;
+    var v = rates[d][0];
+    if (v === '' || v == null) continue;
     map[normName_(nm)] = round1_(num_(v));
-  });
+  }
   return map;
 }
 
@@ -833,17 +1084,17 @@ function readAbsenceForStudent_(name, gradeToken, subjectKey) {
   if (!label) return null;
   var sh = resolveAbsenceSheet_(gradeToken, label);
   if (!sh) return null;
-  var c = absCols_(sh);
-  if (!c.headerRow || !c.nameCol || !c.rateCol) return null;
+  var L = absLayout_(sh);
+  if (!L) return null;
   var lastRow = sh.getLastRow();
-  var firstData = c.headerRow + 1;
+  var firstData = L.dataStart;
   if (lastRow < firstData) return null;
-  var hits = sh.getRange(firstData, c.nameCol, lastRow - firstData + 1, 1).createTextFinder(name).matchEntireCell(true).findAll();
+  var hits = sh.getRange(firstData, L.nameCol, lastRow - firstData + 1, 1).createTextFinder(name).matchEntireCell(true).findAll();
   for (var j = 0; j < hits.length; j++) {
     var rn = hits[j].getRow();
     if (rn < firstData) continue;
     if (normName_(hits[j].getValue()) === normName_(name)) {
-      var v = sh.getRange(rn, c.rateCol).getValue();
+      var v = sh.getRange(rn, L.rateCol).getValue();
       if (v === '' || v == null) return null;
       return round1_(num_(v));
     }
@@ -887,7 +1138,13 @@ function rebuildAll_(force) {
     var snap = recentSnapshot_(cache, REBUILD_DEDUP_POST_SEC);
     if (snap) return snap;
 
+    // ── 計測（PROFILE）：各処理の所要msを Logger に出す。ボトルネック特定用。挙動は変えない。
+    var _p0 = Date.now(), _pm = _p0;
+    function _lap(label) { var now = Date.now(); _PROFILE_LAPS.push(label + '=' + (now - _pm) + 'ms'); _pm = now; }
+    var _PROFILE_LAPS = [];
+
     var roster = readRoster_(); // [{name,grade,subjects[],homeroom}]
+    _lap('roster');
     if (!roster.length) {
       cachePutBig_(cache, 'students', JSON.stringify({ students: [], homerooms: [] }), CONFIG.CACHE_NODATA_SEC);
       setRebuildEpoch_(cache);
@@ -897,27 +1154,37 @@ function rebuildAll_(force) {
     // 履修されている科目だけ、演習成績シートを「丸ごと1回」ロード
     var usedSubjects = {};
     roster.forEach(function (r) { r.subjects.forEach(function (s) { usedSubjects[s] = true; }); });
-    var scoresLoaded = {}; // subjectKey -> { header, byName }
-    Object.keys(usedSubjects).forEach(function (s) { scoresLoaded[s] = loadScoresSheet_(s); });
+    var scoresLoaded = loadScoresForSubjects_(Object.keys(usedSubjects)); // subjectKey -> { header, byName }
+    _lap('scores');
 
     // マーク模試を1回ロード（normName -> 行配列[]）
     var mockByName = loadMockByName_();
+    var _mockRows = 0; try { Object.keys(mockByName).forEach(function (k) { _mockRows += mockByName[k].length; }); } catch (e) {}
+    _lap('mock(rows=' + _mockRows + ')');
 
     // 欠席率マップ（学年|科目ごとに1回）
     var absMaps = buildAbsenceMapsForRoster_(roster);
+    _lap('absence');
 
     // 一覧 & 全生徒詳細を構築
     var list = buildStudentsList_(roster, scoresLoaded, absMaps);
     var details = buildAllDetails_(roster, scoresLoaded, mockByName, absMaps);
+    _lap('build(details=' + Object.keys(details).length + ')');
 
     // ★A: 全チャンクを1つの map にまとめ、数回の putAll でまとめ書き（従来は生徒ごとに putAll＝約105往復）。
     var entries = {};
-    addBigEntries_(entries, 'students', JSON.stringify({ students: list.students, homerooms: list.homerooms }));
+    var studentsJson = JSON.stringify({ students: list.students, homerooms: list.homerooms });
+    addBigEntries_(entries, 'students', studentsJson);
     Object.keys(details).forEach(function (nn) {
       addBigEntries_(entries, 'detail:' + nn, JSON.stringify({ detail: details[nn] }));
     });
+    var _bytes = 0; Object.keys(entries).forEach(function (k) { _bytes += (entries[k] || '').length; });
     putAllBatched_(cache, entries, CONFIG.CACHE_DETAIL_SEC);
+    _lap('cacheWrite(keys=' + Object.keys(entries).length + ',KB=' + Math.round(_bytes / 1024) + ')');
+    Logger.log('rebuildAll_ PROFILE total=%sms | %s', (Date.now() - _p0), _PROFILE_LAPS.join(' / '));
     setRebuildEpoch_(cache);
+    setStudentsEpoch_(cache); // 一覧パス（rebuildStudentsList_）の鮮度チェックも満たしておく
+    saveStudentsProp_(studentsJson); // ★L2: 揮発しない永続スナップショット(ScriptProperties)も更新
     try {
       cache.put('snapshot_meta', JSON.stringify({
         at: Utilities.formatDate(new Date(), TZ, 'yyyy/MM/dd HH:mm:ss'),
@@ -943,6 +1210,67 @@ function recentSnapshot_(cache, withinSec) {
 }
 function rebuildEpoch_(cache) { var v = cache.get('rebuild_epoch'); return v ? (parseInt(v, 10) || 0) : 0; }
 function setRebuildEpoch_(cache) { try { cache.put('rebuild_epoch', String(Date.now()), CONFIG.CACHE_DETAIL_SEC); } catch (e) {} }
+
+/* ===================== STUDENTS-ONLY 軽量再計算 =====================
+ * 一覧（buildStudentsList_）は roster＋演習成績シート（小）＋欠席率だけで作れ、
+ * マーク模試(約2.9万行)も全生徒詳細も不要。よってユーザーの一覧アクセスがキャッシュ未ヒット
+ * でも、重い rebuildAll_ ではなくこの関数で「一覧だけ」を数秒で作り直してキャッシュする。
+ * 鮮度管理は students_epoch（rebuild_epoch とは別キー）で行い、全再計算の二重防止ロジックに干渉しない。*/
+function studentsEpoch_(cache) { var v = cache.get('students_epoch'); return v ? (parseInt(v, 10) || 0) : 0; }
+function setStudentsEpoch_(cache) { try { cache.put('students_epoch', String(Date.now()), CONFIG.CACHE_STUDENTS_SEC); } catch (e) {} }
+
+/* 直近 withinSec 秒以内に一覧を作成済みなら、キャッシュ上の {students,homerooms} を返す。*/
+function recentStudents_(cache, withinSec) {
+  var ep = studentsEpoch_(cache);
+  if (!ep || (Date.now() - ep) > withinSec * 1000) return null;
+  var sHit = cacheGetBig_(cache, 'students');
+  if (!sHit) return null;
+  var s = safeParse_(sHit);
+  if (!s) return null;
+  return { students: s.students || [], homerooms: s.homerooms || [] };
+}
+
+/* 一覧だけを軽量再計算（マーク模試も全生徒詳細も読まない）。
+ *  - ロックは短時間 tryLock のみで、長くは待たない（重い rebuildAll_ 進行中でもユーザーを待たせない）。
+ *  - ロックを取れなければ、既存キャッシュがあれば即返す／無ければロック無しで自前計算（小シートのみ）。*/
+function rebuildStudentsList_() {
+  var cache = CacheService.getScriptCache();
+  var pre = recentStudents_(cache, REBUILD_DEDUP_PRE_SEC);
+  if (pre) return pre;
+
+  var lock = LockService.getScriptLock();
+  var have = false;
+  try { have = lock.tryLock(1500); } catch (e) {}
+  if (!have) {
+    var hit = cacheGetBig_(cache, 'students');
+    if (hit) { var p = safeParse_(hit); if (p) return { students: p.students || [], homerooms: p.homerooms || [] }; }
+    // キャッシュも無い → ロック無しで一覧だけ自前計算（小さい演習シートのみ・数秒）。
+  }
+  try {
+    if (have) {
+      var snap = recentStudents_(cache, REBUILD_DEDUP_POST_SEC);
+      if (snap) return snap;
+    }
+    var roster = readRoster_();
+    if (!roster.length) {
+      cachePutBig_(cache, 'students', JSON.stringify({ students: [], homerooms: [] }), CONFIG.CACHE_NODATA_SEC);
+      setStudentsEpoch_(cache);
+      return { students: [], homerooms: [] };
+    }
+    var usedSubjects = {};
+    roster.forEach(function (r) { r.subjects.forEach(function (s) { usedSubjects[s] = true; }); });
+    var scoresLoaded = loadScoresForSubjects_(Object.keys(usedSubjects)); // 演習成績シートのみ（マーク模試は読まない）
+    var absMaps = buildAbsenceMapsForRoster_(roster);
+    var list = buildStudentsList_(roster, scoresLoaded, absMaps);
+    var studentsJson = JSON.stringify({ students: list.students, homerooms: list.homerooms });
+    cachePutBig_(cache, 'students', studentsJson, CONFIG.CACHE_STUDENTS_SEC);
+    setStudentsEpoch_(cache);
+    saveStudentsProp_(studentsJson); // ★L2: 永続スナップショットも更新
+    return { students: list.students, homerooms: list.homerooms };
+  } finally {
+    if (have) { try { lock.releaseLock(); } catch (e) {} }
+  }
+}
 
 /* 公開トリガー関数：GAS エディタで時間主導トリガーに割り当てる（30分ごと推奨）。
  * セルフテスト用に手動実行も可。実行ログに所要時間と件数を出す。                      */
@@ -1027,10 +1355,66 @@ function cacheGetBig_(cache, key) {
 }
 function safeParse_(s) { try { return JSON.parse(s); } catch (e) { return null; } }
 
+/* ===================== 一覧スナップショットの永続化（ScriptProperties + gzip） =====================
+ * CacheService は TTL 内でも数分で揮発するため、一覧JSONを gzip 圧縮して ScriptProperties にも保存する（L2）。
+ * これにより doGet の非fresh ミス時も再計算ゼロ（約0.1秒）で返せ、cold/evicted/初回でも常に速い。
+ *  - 1プロパティ9KB上限に対し、base64文字列を CHUNK 文字ずつ分割保存（将来 students 増でも安全）。
+ *  - meta に {n=チャンク数, at=保存時刻ms, len=base64長} を持ち、整合性・鮮度を検証。
+ *  - 空ロスター等の縮退結果では保存しない（直前の良いスナップショットを潰さないため、呼び出し側で制御）。*/
+var STUDENTS_PROP = { META: 'students_blob_meta', PREFIX: 'students_blob_', CHUNK: 8000 };
+
+function saveStudentsProp_(jsonString) {
+  try {
+    if (!jsonString) return;
+    var gz = Utilities.gzip(Utilities.newBlob(jsonString, 'application/json', 'students.json'));
+    var b64 = Utilities.base64Encode(gz.getBytes());
+    var n = Math.ceil(b64.length / STUDENTS_PROP.CHUNK);
+    var props = PropertiesService.getScriptProperties();
+    var prevN = 0;
+    try { var pm = props.getProperty(STUDENTS_PROP.META); if (pm) prevN = (JSON.parse(pm).n || 0); } catch (e) {}
+    var toSet = {};
+    for (var i = 0; i < n; i++) toSet[STUDENTS_PROP.PREFIX + i] = b64.substr(i * STUDENTS_PROP.CHUNK, STUDENTS_PROP.CHUNK);
+    toSet[STUDENTS_PROP.META] = JSON.stringify({ n: n, at: Date.now(), len: b64.length });
+    props.setProperties(toSet); // 既存の他キーは保持
+    for (var j = n; j < prevN; j++) { try { props.deleteProperty(STUDENTS_PROP.PREFIX + j); } catch (e) {} } // 余ったチャンクを掃除
+    Logger.log('STUDENTS prop saved: chunks=%s, b64KB=%s', n, Math.round(b64.length / 1024));
+  } catch (e) {
+    Logger.log('STUDENTS prop save 失敗: %s', (e && e.message) || e);
+  }
+}
+
+/* 永続スナップショットを読む。maxAgeSec を超えて古ければ null（=呼び出し側で再計算へ）。*/
+function loadStudentsProp_(maxAgeSec) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var all = props.getProperties();
+    var pm = all[STUDENTS_PROP.META];
+    if (!pm) return null;
+    var meta = JSON.parse(pm);
+    if (!meta || !meta.n) return null;
+    if (maxAgeSec && meta.at && (Date.now() - meta.at) > maxAgeSec * 1000) return null;
+    var b64 = '';
+    for (var i = 0; i < meta.n; i++) {
+      var part = all[STUDENTS_PROP.PREFIX + i];
+      if (part == null) return null; // チャンク欠損→無効
+      b64 += part;
+    }
+    if (meta.len && b64.length !== meta.len) return null; // 整合性チェック
+    var bytes = Utilities.base64Decode(b64);
+    return Utilities.ungzip(Utilities.newBlob(bytes, 'application/x-gzip')).getDataAsString();
+  } catch (e) {
+    Logger.log('STUDENTS prop load 失敗: %s', (e && e.message) || e);
+    return null;
+  }
+}
+
 /* ===================== helpers ===================== */
+/* ★案3：openById のメモ化。同一実行中は1スプレッドシートを1回だけ開く（GASは実行ごとにグローバル初期化）。
+ *  scores(同一ブックを5回開いていた)・roster・mock・フォールバックに波及。*/
+var _SS_MEMO_ = {};
 function getSheet_(ssId, sheetName) {
   try {
-    var ss = SpreadsheetApp.openById(ssId);
+    var ss = _SS_MEMO_[ssId] || (_SS_MEMO_[ssId] = SpreadsheetApp.openById(ssId));
     return ss.getSheetByName(sheetName);
   } catch (e) { return null; }
 }
