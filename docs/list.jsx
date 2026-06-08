@@ -339,7 +339,7 @@ function StudentListScreen({ nav, query, layout = 'table', state = 'normal', den
             <span>担任</span>
             <select value={homeroomFilter} onChange={(e) => setHomeroomFilter(e.target.value)}>
               <option value="all">全担任</option>
-              {HOMEROOMS.map(h => <option key={h} value={h}>{h} 先生</option>)}
+              {HOMEROOMS.map(h => <option key={h} value={h}>{h}</option>)}
             </select>
           </div>
           <div className="tw-sort">
