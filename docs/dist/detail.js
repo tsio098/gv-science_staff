@@ -314,6 +314,73 @@ function MockExamCard({
   })), React.createElement("td", {
     className: "mk-tot gv-num"
   }, e.total)))))), React.createElement("div", {
+    className: "mk-cards"
+  }, rows.map((e, i) => {
+    const items = [];
+    if (e.full) items.push({
+      k: '国語',
+      v: e.kokugo && e.kokugo.total
+    });
+    items.push({
+      k: '英語',
+      v: e.eigo && e.eigo.total
+    });
+    items.push({
+      k: '数学ⅠA',
+      v: e.math && e.math.ia
+    });
+    items.push({
+      k: '数学ⅡB',
+      v: e.math && e.math.iib
+    });
+    if (e.full) {
+      e.rika.forEach(r => {
+        if (r.name && r.name !== '受験していない') items.push({
+          k: r.name,
+          v: r.score,
+          tag: '理'
+        });
+      });
+      e.shakai.forEach(r => {
+        if (r.name && r.name !== '受験していない') items.push({
+          k: r.name,
+          v: r.score,
+          tag: '社'
+        });
+      });
+      items.push({
+        k: '情報',
+        v: e.joho
+      });
+    }
+    return React.createElement("div", {
+      key: i,
+      className: `mk-xcard ${e.full ? '' : 'mk-xcard-partial'}`
+    }, React.createElement("div", {
+      className: "mk-xcard-head"
+    }, React.createElement("span", {
+      className: "mk-xcard-date gv-num"
+    }, e.date.slice(5)), React.createElement("span", {
+      className: "mk-xcard-name"
+    }, e.name, !e.full && React.createElement("span", {
+      className: "mk-pill"
+    }, "\u82F1\u6570")), React.createElement("span", {
+      className: "mk-xcard-tot gv-num"
+    }, e.total, React.createElement("small", null, "/ ", MOCK_FULL_MARKS))), React.createElement("div", {
+      className: "mk-xcard-grid"
+    }, items.map((it, j) => React.createElement("div", {
+      key: j,
+      className: "mk-xcell"
+    }, React.createElement("span", {
+      className: "mk-xcell-k"
+    }, it.tag && React.createElement("i", {
+      className: "mk-xtag"
+    }, it.tag), it.k), React.createElement("span", {
+      className: "mk-xcell-v"
+    }, React.createElement(Num, {
+      v: it.v
+    }))))));
+  })), React.createElement("div", {
     className: "gt-note gt-note-soft"
   }, "\u30DE\u30FC\u30AF\u6A21\u8A66(\u30D5\u30A9\u30FC\u30E0) \u30B7\u30FC\u30C8\u306E\u8A18\u9332\u3092\u65B0\u3057\u3044\u9806\u306B\u8868\u793A\u3002\u300C\u82F1\u6570\u300D\u306F\u56FD\u8A9E\u30FB\u7406\u79D1\u30FB\u793E\u4F1A\u3092\u542B\u307E\u306A\u3044\u6821\u5185\u30DE\u30FC\u30AF\u6A21\u8A66\u3067\u3059\u3002\u5FD7\u671B\u6821\u306F\u30D5\u30A9\u30FC\u30E0 I\u5217\u306E\u6700\u65B0\u56DE\u7B54\u3092\u63A1\u7528\u3057\u3066\u3044\u307E\u3059\u3002"));
 }

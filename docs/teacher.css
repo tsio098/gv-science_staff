@@ -810,3 +810,47 @@ html, body { overflow-x: hidden; }
   .tw-att-mini, .tw-att-mini-row { align-items: flex-start; justify-content: flex-start; }
   .tw-detail-right { align-items: flex-start; }
 }
+
+/* ════════════════════════════════════════════════════════
+   スマホ縦表示の最適化（詳細画面の成績表示）
+   模試の横長テーブルは縦積みカードに切替。カード余白・文字も調整。
+   ════════════════════════════════════════════════════════ */
+
+/* 模試：デスクトップ＝表 / スマホ＝試験ごとのカード */
+.mk-cards { display: none; }
+@media (max-width: 640px) {
+  .mk-tablewrap { display: none; }
+  .mk-cards { display: flex; flex-direction: column; gap: 10px; }
+}
+.mk-xcard {
+  border: 0.5px solid var(--c-divider); border-radius: 14px;
+  background: var(--c-surface); padding: 12px 14px;
+}
+.mk-xcard-partial { background: rgba(247,197,159,0.10); border-color: rgba(247,197,159,0.5); }
+.mk-xcard-head {
+  display: flex; align-items: baseline; gap: 9px;
+  padding-bottom: 9px; margin-bottom: 10px;
+  border-bottom: 0.5px solid var(--c-divider-soft);
+}
+.mk-xcard-date { font-size: 12px; color: var(--c-text-sub); flex: none; }
+.mk-xcard-name { font-size: 13.5px; font-weight: 700; flex: 1; min-width: 0; line-height: 1.3; }
+.mk-xcard-tot { font-size: 19px; font-weight: 700; color: var(--c-primary-deep); flex: none; white-space: nowrap; }
+.mk-xcard-tot small { font-size: 10px; color: var(--c-text-mute); font-weight: 600; margin-left: 2px; }
+.mk-xcard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 14px; }
+.mk-xcell { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.mk-xcell-k {
+  flex: 1; min-width: 0; font-size: 12px; color: var(--c-text-sub);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mk-xtag { font-style: normal; font-size: 9px; font-weight: 700; color: var(--c-text-mute); margin-right: 4px; }
+.mk-xcell-v { flex: none; font-size: 14.5px; font-weight: 700; color: var(--c-text); }
+
+/* gt-card：スマホで余白を詰め、科目タブ／合計サマリーを縦画面向けに */
+@media (max-width: 640px) {
+  .gt-card, .mk-card { padding: 15px 13px 14px; }
+  .gt-seg { max-width: none !important; }
+  .gt-summary { gap: 10px; }
+  .gt-sum-v { font-size: 34px; }
+  .tw-subject-section { padding-top: 16px; }
+  .tw-detail-head { margin-bottom: 10px; }
+}

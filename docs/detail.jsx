@@ -210,6 +210,40 @@ function MockExamCard({ det }) {
           </tbody>
         </table>
       </div>
+
+      {/* ── スマホ縦表示：横長テーブルの代わりに「試験ごとのカード」を縦積み ──
+          デスクトップは上の表、≤640px ではこちらをCSSで表示。 */}
+      <div className="mk-cards">
+        {rows.map((e, i) => {
+          const items = [];
+          if (e.full) items.push({ k: '国語', v: e.kokugo && e.kokugo.total });
+          items.push({ k: '英語', v: e.eigo && e.eigo.total });
+          items.push({ k: '数学ⅠA', v: e.math && e.math.ia });
+          items.push({ k: '数学ⅡB', v: e.math && e.math.iib });
+          if (e.full) {
+            e.rika.forEach((r) => { if (r.name && r.name !== '受験していない') items.push({ k: r.name, v: r.score, tag: '理' }); });
+            e.shakai.forEach((r) => { if (r.name && r.name !== '受験していない') items.push({ k: r.name, v: r.score, tag: '社' }); });
+            items.push({ k: '情報', v: e.joho });
+          }
+          return (
+            <div key={i} className={`mk-xcard ${e.full ? '' : 'mk-xcard-partial'}`}>
+              <div className="mk-xcard-head">
+                <span className="mk-xcard-date gv-num">{e.date.slice(5)}</span>
+                <span className="mk-xcard-name">{e.name}{!e.full && <span className="mk-pill">英数</span>}</span>
+                <span className="mk-xcard-tot gv-num">{e.total}<small>/ {MOCK_FULL_MARKS}</small></span>
+              </div>
+              <div className="mk-xcard-grid">
+                {items.map((it, j) =>
+                  <div key={j} className="mk-xcell">
+                    <span className="mk-xcell-k">{it.tag && <i className="mk-xtag">{it.tag}</i>}{it.k}</span>
+                    <span className="mk-xcell-v"><Num v={it.v} /></span>
+                  </div>
+                )}
+              </div>
+            </div>);
+        })}
+      </div>
+
       <div className="gt-note gt-note-soft">マーク模試(フォーム) シートの記録を新しい順に表示。「英数」は国語・理科・社会を含まない校内マーク模試です。志望校はフォーム I列の最新回答を採用しています。</div>
     </div>);
 
