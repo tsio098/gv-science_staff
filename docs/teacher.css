@@ -29,6 +29,12 @@ body {
     var(--c-bg);
 }
 
+/* スマホ縦表示の崩れ対策：ページ全体が横にはみ出して横スクロールするのを防ぐ。
+   個別の横スクロール領域（模試テーブル .mk-tablewrap / 一覧テーブル .tw-tablescroll）は
+   自前の overflow-x:auto を持つため、ここで止めても内部スクロールには影響しない。 */
+html, body { overflow-x: hidden; }
+.tw-root, .tw-frame, .tw-main { max-width: 100%; }
+
 /* device-preview frame (Tweak) */
 .tw-frame {
   width: 100%;
@@ -609,10 +615,20 @@ body {
    ════════════════════════════════════════════════════════ */
 @media (max-width: 720px) {
   .tw-header { gap: 10px; padding: 10px 14px; flex-wrap: wrap; }
+  .tw-brand { flex: 1 1 auto; min-width: 0; }
   .tw-search { width: 100%; order: 3; }
   .tw-id-name { display: none; }
   .tw-main { padding: 18px 14px 56px; }
   .tw-overview-grid { grid-template-columns: 1fr; gap: 12px; }
+  .tw-cards { grid-template-columns: 1fr; }
+}
+
+/* 狭い画面：ヘッダーのブランド行が折り返さず横幅を超える対策。
+   ロゴと「TEACHER」ピルは残し、説明テキスト「成績ダッシュボード」と区切り線は隠す。 */
+@media (max-width: 480px) {
+  .tw-brand-divider { display: none; }
+  .tw-brand-role { font-size: 0; gap: 0; }
+  .tw-brand-role .pill { font-size: 10px; }
 }
 .tw-root[data-device="mobile"] .tw-header { gap: 10px; flex-wrap: wrap; }
 .tw-root[data-device="mobile"] .tw-search { width: 100%; order: 3; }
