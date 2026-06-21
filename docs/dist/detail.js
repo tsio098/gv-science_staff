@@ -45,6 +45,10 @@ const METRICS = [{
   label: '偏差値',
   unit: ''
 }];
+function fmt1(v) {
+  if (v == null || Number.isNaN(+v)) return '–';
+  return (Math.round(+v * 10) / 10).toFixed(1);
+}
 function colorForField(det, subject, field) {
   const idx = det.data[subject].fields.indexOf(field);
   return FIELD_COLORS[(idx % FIELD_COLORS.length + FIELD_COLORS.length) % FIELD_COLORS.length];
@@ -94,7 +98,7 @@ function Delta2({
   const cls = dv > 0.05 ? 'up' : dv < -0.05 ? 'down' : 'flat';
   return React.createElement("span", {
     className: `gt-sw-d ${cls} gv-num`
-  }, dv > 0 ? '+' : '', dv);
+  }, dv > 0 ? '+' : '', dv.toFixed(1));
 }
 const MOCK_FULL_MARKS = 1000;
 function Num({
@@ -604,13 +608,13 @@ function StudentDetailScreen({
     className: "gt-sum-v"
   }, React.createElement("span", {
     className: "gv-num"
-  }, latest.total), React.createElement("span", {
+  }, fmt1(latest.total)), React.createElement("span", {
     className: "gt-sum-u"
   }, "\u70B9")), prev && React.createElement("div", {
     className: `gt-sum-delta ${delta >= 0 ? 'up' : 'down'}`
   }, delta >= 0 ? '▲' : '▼', " ", React.createElement("span", {
     className: "gv-num"
-  }, Math.abs(delta)))), React.createElement("div", {
+  }, fmt1(Math.abs(delta))))), React.createElement("div", {
     className: "gt-sum-sub"
   }, React.createElement("div", {
     className: "gt-sum-cell"
@@ -618,13 +622,13 @@ function StudentDetailScreen({
     className: "k"
   }, "\u5E73\u5747"), React.createElement("span", {
     className: "v gv-num"
-  }, latest.avg)), React.createElement("div", {
+  }, fmt1(latest.avg))), React.createElement("div", {
     className: "gt-sum-cell acc"
   }, React.createElement("span", {
     className: "k"
   }, "\u504F\u5DEE\u5024"), React.createElement("span", {
     className: "v gv-num"
-  }, latest.hensachi)))), tt.length > 14 && React.createElement("div", {
+  }, fmt1(latest.hensachi))))), tt.length > 14 && React.createElement("div", {
     className: "gt-range"
   }, [['直近12', 12], ['直近30', 30], ['全期間', 'all']].map(([lb, v]) => React.createElement("button", {
     key: lb,
@@ -675,9 +679,9 @@ function StudentDetailScreen({
     className: "gt-test-name"
   }, p.test), React.createElement("span", {
     className: "gt-test-score gv-num"
-  }, p.total, React.createElement("small", null, "\u70B9")), React.createElement("span", {
+  }, fmt1(p.total), React.createElement("small", null, "\u70B9")), React.createElement("span", {
     className: "gt-test-hen gv-num"
-  }, "\u504F ", p.hensachi)))))), React.createElement("div", {
+  }, "\u504F ", fmt1(p.hensachi))))))), React.createElement("div", {
     className: "gt-card"
   }, React.createElement("div", {
     className: "gt-card-head"
@@ -794,9 +798,9 @@ function StudentDetailScreen({
       className: "gt-fd-month gv-num"
     }, monthShort(m)), React.createElement("span", {
       className: "gt-fd-rate gv-num"
-    }, d.rate[f][i], React.createElement("small", null, "%")), React.createElement("span", {
+    }, fmt1(d.rate[f][i]), React.createElement("small", null, "%")), React.createElement("span", {
       className: "gt-fd-hen gv-num"
-    }, "\u504F ", d.hensachi[f][i]))));
+    }, "\u504F ", fmt1(d.hensachi[f][i])))));
   })) : React.createElement("div", {
     className: "gt-note gt-note-soft"
   }, "\u5206\u91CE\u3092\u9078\u629E\u3059\u308B\u3068\u3001\u6708\u6BCE\u306E\u5F97\u70B9\u7387\u30FB\u504F\u5DEE\u5024\u304C\u4E00\u89A7\u8868\u793A\u3055\u308C\u307E\u3059\u3002")), React.createElement("div", {
@@ -832,7 +836,7 @@ function StudentDetailScreen({
     className: "gt-sw-name"
   }, f), React.createElement("span", {
     className: "gt-sw-v gv-num"
-  }, v, swMetric.unit), React.createElement(Delta2, {
+  }, fmt1(v), swMetric.unit), React.createElement(Delta2, {
     v: prev != null ? v - prev : null
   })))), React.createElement("div", {
     className: "gt-sw-col"
@@ -857,7 +861,7 @@ function StudentDetailScreen({
     className: "gt-sw-name"
   }, f), React.createElement("span", {
     className: "gt-sw-v gv-num"
-  }, v, swMetric.unit), React.createElement(Delta2, {
+  }, fmt1(v), swMetric.unit), React.createElement(Delta2, {
     v: prev != null ? v - prev : null
   })))))), fv === 'strengths' && React.createElement("div", {
     className: "gt-note gt-note-soft",

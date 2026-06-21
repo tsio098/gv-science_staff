@@ -45,6 +45,12 @@ const METRICS = [
 { key: 'avgRate', label: '平均得点率', unit: '%' },
 { key: 'hensachi', label: '偏差値', unit: '' }];
 
+// GV Science と同じ「小数1桁」表示（null/NaN は '–'）
+function fmt1(v) {
+  if (v == null || Number.isNaN(+v)) return '–';
+  return (Math.round(+v * 10) / 10).toFixed(1);
+}
+
 
 function colorForField(det, subject, field) {
   const idx = det.data[subject].fields.indexOf(field);
@@ -84,7 +90,7 @@ function Delta2({ v, unit }) {
   if (v == null) return <span className="gt-sw-d flat gv-num">–</span>;
   const dv = Math.round(v * 10) / 10;
   const cls = dv > 0.05 ? 'up' : dv < -0.05 ? 'down' : 'flat';
-  return <span className={`gt-sw-d ${cls} gv-num`}>{dv > 0 ? '+' : ''}{dv}</span>;
+  return <span className={`gt-sw-d ${cls} gv-num`}>{dv > 0 ? '+' : ''}{dv.toFixed(1)}</span>;
 }
 
 // ── 全国一斉模試（共通テスト型マーク模試）──────────────────
@@ -390,14 +396,14 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
           <div className="gt-summary">
             <div className="gt-sum-main">
               <div className="gt-sum-k">直近</div>
-              <div className="gt-sum-v"><span className="gv-num">{latest.total}</span><span className="gt-sum-u">点</span></div>
+              <div className="gt-sum-v"><span className="gv-num">{fmt1(latest.total)}</span><span className="gt-sum-u">点</span></div>
               {prev &&
-              <div className={`gt-sum-delta ${delta >= 0 ? 'up' : 'down'}`}>{delta >= 0 ? '▲' : '▼'} <span className="gv-num">{Math.abs(delta)}</span></div>
+              <div className={`gt-sum-delta ${delta >= 0 ? 'up' : 'down'}`}>{delta >= 0 ? '▲' : '▼'} <span className="gv-num">{fmt1(Math.abs(delta))}</span></div>
               }
             </div>
             <div className="gt-sum-sub">
-              <div className="gt-sum-cell"><span className="k">平均</span><span className="v gv-num">{latest.avg}</span></div>
-              <div className="gt-sum-cell acc"><span className="k">偏差値</span><span className="v gv-num">{latest.hensachi}</span></div>
+              <div className="gt-sum-cell"><span className="k">平均</span><span className="v gv-num">{fmt1(latest.avg)}</span></div>
+              <div className="gt-sum-cell acc"><span className="k">偏差値</span><span className="v gv-num">{fmt1(latest.hensachi)}</span></div>
             </div>
           </div>
 
@@ -430,8 +436,8 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
               <div key={i} className="gt-test-row">
                   <span className="gt-test-date gv-num">{p.date.slice(5)}</span>
                   <span className="gt-test-name">{p.test}</span>
-                  <span className="gt-test-score gv-num">{p.total}<small>点</small></span>
-                  <span className="gt-test-hen gv-num">偏 {p.hensachi}</span>
+                  <span className="gt-test-score gv-num">{fmt1(p.total)}<small>点</small></span>
+                  <span className="gt-test-hen gv-num">偏 {fmt1(p.hensachi)}</span>
                 </div>
               )}
             </div>
@@ -494,8 +500,8 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
                           {present.map(({ m, i }) =>
                       <div key={i} className="gt-fd-row">
                               <span className="gt-fd-month gv-num">{monthShort(m)}</span>
-                              <span className="gt-fd-rate gv-num">{d.rate[f][i]}<small>%</small></span>
-                              <span className="gt-fd-hen gv-num">偏 {d.hensachi[f][i]}</span>
+                              <span className="gt-fd-rate gv-num">{fmt1(d.rate[f][i])}<small>%</small></span>
+                              <span className="gt-fd-hen gv-num">偏 {fmt1(d.hensachi[f][i])}</span>
                             </div>
                       )}
                         </div>);
@@ -524,7 +530,7 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
               <div key={f} className="gt-sw-row">
                     <span className="gt-sw-bar" style={{ background: 'var(--c-primary)', width: `${Math.max(8, swMetric.unit === '%' ? v : v)}%` }} />
                     <span className="gt-sw-name">{f}</span>
-                    <span className="gt-sw-v gv-num">{v}{swMetric.unit}</span>
+                    <span className="gt-sw-v gv-num">{fmt1(v)}{swMetric.unit}</span>
                     <Delta2 v={prev != null ? v - prev : null} />
                   </div>
               )}
@@ -535,7 +541,7 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
               <div key={f} className="gt-sw-row">
                     <span className="gt-sw-bar" style={{ background: 'var(--c-accent)', width: `${Math.max(8, v)}%` }} />
                     <span className="gt-sw-name">{f}</span>
-                    <span className="gt-sw-v gv-num">{v}{swMetric.unit}</span>
+                    <span className="gt-sw-v gv-num">{fmt1(v)}{swMetric.unit}</span>
                     <Delta2 v={prev != null ? v - prev : null} />
                   </div>
               )}

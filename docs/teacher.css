@@ -854,3 +854,21 @@ html, body { overflow-x: hidden; }
   .tw-subject-section { padding-top: 16px; }
   .tw-detail-head { margin-bottom: 10px; }
 }
+
+/* ── スマホ縦：詳細画面の横はみ出し防止（右側の見切れ対策）──────────────
+   どの要素も画面幅を超えないよう、詳細とカードを画面幅に収め、
+   横並び要素は縮小/折り返しを許可する。横スクロールは増やさない。 */
+@media (max-width: 640px) {
+  .tw-main.tw-detail { max-width: 100% !important; width: 100%; }
+  .tw-detail-grid { width: 100%; min-width: 0; }
+  .tw-detail-grid > .gt-card,
+  .tw-detail .gt-card { max-width: 100%; min-width: 0; }
+  /* カード内の横並び（見出し・サマリー）は縮小/折り返しを許可 */
+  .gt-card-head { min-width: 0; gap: 8px; }
+  .gt-card-title { min-width: 0; }
+  .gt-summary { flex-wrap: wrap; }
+  .gt-sum-main { min-width: 0; }
+  /* 詳細ヘッダー（生徒名＋出席率）も画面内に収める */
+  .tw-detail-head { flex-wrap: wrap; }
+  .tw-detail-right { min-width: 0; max-width: 100%; }
+}
