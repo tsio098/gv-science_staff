@@ -719,43 +719,22 @@ function StudentDetailScreen({
   }, React.createElement("span", {
     className: "gt-leg"
   }, React.createElement("span", {
-    style: {
-      display: 'inline-block',
-      width: 16,
-      borderTop: '2.6px solid var(--c-text-sub)',
-      marginRight: 6,
-      verticalAlign: 'middle'
-    }
+    className: "gt-leg-line solid-n"
   }), "\u5F97\u70B9\u7387"), React.createElement("span", {
     className: "gt-leg"
   }, React.createElement("span", {
-    style: {
-      display: 'inline-block',
-      width: 16,
-      borderTop: '2px dashed var(--c-text-sub)',
-      marginRight: 6,
-      verticalAlign: 'middle'
-    }
+    className: "gt-leg-line dash-n"
   }), "\u5E73\u5747\u5F97\u70B9\u7387"), React.createElement("span", {
     className: "gt-leg"
   }, React.createElement("span", {
-    style: {
-      display: 'inline-block',
-      width: 16,
-      borderTop: '1.5px solid var(--c-text-mute)',
-      marginRight: 6,
-      verticalAlign: 'middle'
-    }
+    className: "gt-leg-line thin-n"
   }), "\u504F\u5DEE\u5024 ", React.createElement("span", {
     className: "gv-en",
     style: {
       opacity: .6
     }
   }, "(\u53F3\u8EF8)")), React.createElement("span", {
-    className: "gt-leg",
-    style: {
-      color: 'var(--c-text-mute)'
-    }
+    className: "gt-leg gt-leg-note"
   }, "\u7DDA\u306E\u8272\uFF1D\u5206\u91CE")), React.createElement("div", {
     className: "gt-fieldchips"
   }, d.fields.map(f => {
@@ -829,7 +808,7 @@ function StudentDetailScreen({
     className: `gt-seg-btn ${m.key === swMetricKey ? 'on' : ''}`,
     onClick: () => setMetric(m.key)
   }, m.label))), React.createElement("div", {
-    className: "tw-sw-grid"
+    className: "gt-sw"
   }, React.createElement("div", {
     className: "gt-sw-col"
   }, React.createElement("div", {

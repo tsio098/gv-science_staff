@@ -520,8 +520,8 @@ html, body { overflow-x: hidden; }
   /* グラフは列幅に合わせて自動縮尺 */
   .gt-chart { height: auto !important; width: 100% !important; }
 
-  /* 分野別＝得点傾向（得意/苦手）。Webデザイン（背景バー・2カラム）を踏襲しつつ少し詰める。 */
-  .tw-sw-grid { grid-template-columns: 1fr 1fr !important; gap: 12px !important; }
+  /* 分野別＝得点傾向（得意/苦手）。画面はGV Scienceと同じ1列だが、PDF(B4横)は紙幅に合わせ2列で配置。 */
+  .gt-sw { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 12px !important; }
   .gt-sw-h { font-size: 11px !important; margin-bottom: 5px !important; }
   .gt-sw-badge { font-size: 10px !important; padding: 1px 7px !important; }
   .gt-sw-row { padding: 5px 9px !important; margin-bottom: 4px !important; border-radius: 9px !important; }

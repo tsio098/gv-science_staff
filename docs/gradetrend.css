@@ -199,6 +199,11 @@
 .gt-leg-line.main { border-color: var(--c-primary-deep); }
 .gt-leg-line.dash { border-top-style: dashed; border-top-width: 2px; border-color: var(--c-text-mute); }
 .gt-leg-line.acc { border-color: var(--c-accent); opacity: 0.7; }
+/* 分野別チャート凡例（線種のみ示す中立色。色は分野ごとに変わるため）— GV Science と統一 */
+.gt-leg-line.solid-n { border-top-width: 3px; border-color: var(--c-text-sub); }
+.gt-leg-line.dash-n { border-top-style: dashed; border-top-width: 2px; border-color: var(--c-text-sub); }
+.gt-leg-line.thin-n { border-top-width: 1.5px; border-color: var(--c-text-sub); opacity: 0.5; }
+.gt-leg-note { color: var(--c-text-mute); }
 
 /* ── recent tests list ─────────────────────────────────── */
 .gt-tests {

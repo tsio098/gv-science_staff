@@ -463,10 +463,10 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
               </div>
               <Measured h={220}>{(w) => <FieldMultiChart months={months} fields={fieldSeries} width={w} />}</Measured>
               <div className="gt-legend">
-                <span className="gt-leg"><span style={{ display: 'inline-block', width: 16, borderTop: '2.6px solid var(--c-text-sub)', marginRight: 6, verticalAlign: 'middle' }} />得点率</span>
-                <span className="gt-leg"><span style={{ display: 'inline-block', width: 16, borderTop: '2px dashed var(--c-text-sub)', marginRight: 6, verticalAlign: 'middle' }} />平均得点率</span>
-                <span className="gt-leg"><span style={{ display: 'inline-block', width: 16, borderTop: '1.5px solid var(--c-text-mute)', marginRight: 6, verticalAlign: 'middle' }} />偏差値 <span className="gv-en" style={{ opacity: .6 }}>(右軸)</span></span>
-                <span className="gt-leg" style={{ color: 'var(--c-text-mute)' }}>線の色＝分野</span>
+                <span className="gt-leg"><span className="gt-leg-line solid-n" />得点率</span>
+                <span className="gt-leg"><span className="gt-leg-line dash-n" />平均得点率</span>
+                <span className="gt-leg"><span className="gt-leg-line thin-n" />偏差値 <span className="gv-en" style={{ opacity: .6 }}>(右軸)</span></span>
+                <span className="gt-leg gt-leg-note">線の色＝分野</span>
               </div>
               <div className="gt-fieldchips">
                 {d.fields.map((f) => {
@@ -517,7 +517,7 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
               <button key={m.key} className={`gt-seg-btn ${m.key === swMetricKey ? 'on' : ''}`} onClick={() => setMetric(m.key)}>{m.label}</button>
               )}
             </div>
-            <div className="tw-sw-grid">
+            <div className="gt-sw">
               <div className="gt-sw-col">
                 <div className="gt-sw-h"><span className="gt-sw-badge strong">得意</span>直近の上位{cnt}</div>
                 {strong.map(({ f, v, prev }) =>
