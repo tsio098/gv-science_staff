@@ -165,6 +165,35 @@
     return run();
   }
 
+  // ── shibou (おすすめ志望校・生徒1人) ────────────────────
+  //   fetchDetail と同じSWR/リトライ方針。GAS `shibouResults`（氏名→USERIDはGAS内で解決）。
+  async function fetchShibou(name, opts) {
+    opts = opts || {};
+    if (SAMPLE) {
+      const d = (window.__SAMPLE__ || {}).shibou || {};
+      return d[name] ? { status: 'ok', results: d[name], sample: true } : { status: 'empty', results: [] };
+    }
+    const cacheK = 'shibou:' + name;
+    const cached = !opts.fresh ? cacheGet(cacheK) : null;
+
+    const run = async () => {
+      const j = await fetchJSON(buildUrl('shibouResults', Object.assign({ name }, opts.fresh ? { fresh: 1 } : {})));
+      const err = normErr(j);
+      if (err === 'unauthorized') return { status: 'unauthorized' };
+      if (err === 'empty') return { status: 'empty', results: [] };
+      if (err) return { status: 'error', message: j.error };
+      const out = { status: 'ok', results: j.results || [] };
+      cacheSet(cacheK, out);
+      return out;
+    };
+
+    if (cached && !opts.fresh) {
+      if (opts.onRevalidate) run().then((fresh) => { if (fresh.status === 'ok') opts.onRevalidate(fresh); }).catch(() => {});
+      return Object.assign({ stale: true }, cached);
+    }
+    return run();
+  }
+
   function clearCache() {
     try {
       const rm = [];
@@ -179,6 +208,6 @@
   window.GVApi = {
     SAMPLE, ENDPOINT,
     captureTokenFromUrl, getToken, setToken, clearToken, hasToken,
-    fetchStudents, fetchDetail, clearCache,
+    fetchStudents, fetchDetail, fetchShibou, clearCache,
   };
 })();

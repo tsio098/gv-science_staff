@@ -10,7 +10,7 @@ function AttMini({
     className: "tw-att-mini-h"
   }, React.createElement("span", {
     className: "t"
-  }, "\u6388\u696D\u306E\u6B20\u5E2D\u7387"), React.createElement("span", {
+  }, "授業の欠席率"), React.createElement("span", {
     className: "aux"
   }, "ATTENDANCE")), React.createElement("div", {
     className: "tw-att-mini-row"
@@ -93,7 +93,7 @@ function Delta2({
 }) {
   if (v == null) return React.createElement("span", {
     className: "gt-sw-d flat gv-num"
-  }, "\u2013");
+  }, "–");
   const dv = Math.round(v * 10) / 10;
   const cls = dv > 0.05 ? 'up' : dv < -0.05 ? 'down' : 'flat';
   return React.createElement("span", {
@@ -108,7 +108,7 @@ function Num({
 }) {
   if (v == null) return React.createElement("span", {
     className: "mk-na"
-  }, "\u2013");
+  }, "–");
   return React.createElement("span", {
     className: `gv-num ${strong ? 'mk-strong' : ''}`
   }, v, sub ? React.createElement("small", null, sub) : null);
@@ -135,11 +135,11 @@ function MockExamCard({
       className: "gt-card-head"
     }, React.createElement("div", {
       className: "gt-card-title"
-    }, "\u6A21\u8A66\u306E\u6210\u7E3E\u63A8\u79FB", React.createElement("span", {
+    }, "模試の成績推移", React.createElement("span", {
       className: "gt-card-title-sub"
-    }, "\u5171\u901A\u30C6\u30B9\u30C8\u578B\u30DE\u30FC\u30AF\u6A21\u8A66"))), React.createElement("div", {
+    }, "共通テスト型マーク模試"))), React.createElement("div", {
       className: "gt-note gt-note-soft"
-    }, "\u30DE\u30FC\u30AF\u6A21\u8A66\u306E\u8A18\u9332\u304C\u307E\u3060\u3042\u308A\u307E\u305B\u3093\u3002"));
+    }, "マーク模試の記録がまだありません。"));
   }
   const rows = [...mock.exams].reverse();
   const latest = mock.exams[mock.exams.length - 1];
@@ -157,23 +157,23 @@ function MockExamCard({
     className: "gt-card-head"
   }, React.createElement("div", {
     className: "gt-card-title"
-  }, "\u6A21\u8A66\u306E\u6210\u7E3E\u63A8\u79FB", React.createElement("span", {
+  }, "模試の成績推移", React.createElement("span", {
     className: "gt-card-title-sub"
-  }, "\u5171\u901A\u30C6\u30B9\u30C8\u578B\u30DE\u30FC\u30AF\u6A21\u8A66")), React.createElement("div", {
+  }, "共通テスト型マーク模試")), React.createElement("div", {
     className: "gt-card-aux gv-en"
-  }, mock.exams.length, " \u56DE\u53D7\u9A13")), React.createElement("div", {
+  }, mock.exams.length, " 回受験")), React.createElement("div", {
     className: "mk-top"
   }, React.createElement("div", {
     className: "mk-asp"
   }, React.createElement("div", {
     className: "mk-asp-k"
-  }, "\u5FD7\u671B\u6821 ", React.createElement("span", {
+  }, "志望校 ", React.createElement("span", {
     className: "mk-asp-note"
-  }, "\u6700\u65B0")), React.createElement("div", {
+  }, "最新")), React.createElement("div", {
     className: "mk-asp-v"
   }, mock.aspiration), mock.aspHistory.length > 1 && React.createElement("div", {
     className: "mk-asp-hist"
-  }, "\u5C65\u6B74\uFF1A", mock.aspHistory.map((h, i) => React.createElement("span", {
+  }, "履歴：", mock.aspHistory.map((h, i) => React.createElement("span", {
     key: i
   }, i > 0 ? ' → ' : '', React.createElement("span", {
     className: i === mock.aspHistory.length - 1 ? 'cur' : ''
@@ -183,7 +183,7 @@ function MockExamCard({
     className: "mk-sum"
   }, React.createElement("div", {
     className: "mk-sum-k"
-  }, "\u76F4\u8FD1 \u5408\u8A08\u70B9"), React.createElement("div", {
+  }, "直近 合計点"), React.createElement("div", {
     className: "mk-sum-v"
   }, React.createElement("span", {
     className: "gv-num"
@@ -191,11 +191,11 @@ function MockExamCard({
     className: "mk-sum-u"
   }, "/ ", MOCK_FULL_MARKS)), delta != null && React.createElement("div", {
     className: `mk-sum-d ${delta >= 0 ? 'up' : 'down'} gv-num`
-  }, delta >= 0 ? '▲' : '▼', " ", Math.abs(delta), React.createElement("small", null, "\u524D\u56DE\u6BD4"))), React.createElement("div", {
+  }, delta >= 0 ? '▲' : '▼', " ", Math.abs(delta), React.createElement("small", null, "前回比"))), React.createElement("div", {
     className: "mk-sum"
   }, React.createElement("div", {
     className: "mk-sum-k"
-  }, "\u81EA\u5DF1\u30D9\u30B9\u30C8"), React.createElement("div", {
+  }, "自己ベスト"), React.createElement("div", {
     className: "mk-sum-v"
   }, React.createElement("span", {
     className: "gv-num"
@@ -210,47 +210,47 @@ function MockExamCard({
   }, React.createElement("th", {
     rowSpan: "2",
     className: "mk-sticky mk-date"
-  }, "\u8A18\u5165\u65E5"), React.createElement("th", {
+  }, "記入日"), React.createElement("th", {
     rowSpan: "2",
     className: "mk-sticky mk-name"
-  }, "\u8A66\u9A13\u540D"), React.createElement("th", {
+  }, "試験名"), React.createElement("th", {
     colSpan: "4",
     className: "mk-g-ko"
-  }, "\u56FD\u8A9E"), React.createElement("th", {
+  }, "国語"), React.createElement("th", {
     colSpan: "3",
     className: "mk-g-en"
-  }, "\u82F1\u8A9E"), React.createElement("th", {
+  }, "英語"), React.createElement("th", {
     colSpan: "2",
     className: "mk-g-ma"
-  }, "\u6570\u5B66"), React.createElement("th", {
+  }, "数学"), React.createElement("th", {
     colSpan: "6",
     className: "mk-g-ri"
-  }, "\u7406\u79D1"), React.createElement("th", {
+  }, "理科"), React.createElement("th", {
     colSpan: "4",
     className: "mk-g-sh"
-  }, "\u793E\u4F1A"), React.createElement("th", {
+  }, "社会"), React.createElement("th", {
     rowSpan: "2",
     className: "mk-g-jo"
-  }, "\u60C5\u5831"), React.createElement("th", {
+  }, "情報"), React.createElement("th", {
     rowSpan: "2",
     className: "mk-tot"
-  }, "\u5408\u8A08\u70B9")), React.createElement("tr", {
+  }, "合計点")), React.createElement("tr", {
     className: "mk-sub"
-  }, React.createElement("th", null, "\u73FE\u4EE3\u6587"), React.createElement("th", null, "\u53E4\u6587"), React.createElement("th", null, "\u6F22\u6587"), React.createElement("th", {
+  }, React.createElement("th", null, "現代文"), React.createElement("th", null, "古文"), React.createElement("th", null, "漢文"), React.createElement("th", {
     className: "mk-subtot"
-  }, "\u5408\u8A08"), React.createElement("th", null, "\u7B46\u8A18"), React.createElement("th", null, "L"), React.createElement("th", {
+  }, "合計"), React.createElement("th", null, "筆記"), React.createElement("th", null, "L"), React.createElement("th", {
     className: "mk-subtot"
-  }, "\u5408\u8A08"), React.createElement("th", null, "\u2160A"), React.createElement("th", null, "\u2161B"), React.createElement("th", {
+  }, "合計"), React.createElement("th", null, "ⅠA"), React.createElement("th", null, "ⅡB"), React.createElement("th", {
     className: "mk-subjcol"
-  }, "\u7B2C\u4E00\u89E3\u7B54"), React.createElement("th", null, "\u70B9"), React.createElement("th", {
+  }, "第一解答"), React.createElement("th", null, "点"), React.createElement("th", {
     className: "mk-subjcol"
-  }, "\u7B2C\u4E8C\u89E3\u7B54"), React.createElement("th", null, "\u70B9"), React.createElement("th", {
+  }, "第二解答"), React.createElement("th", null, "点"), React.createElement("th", {
     className: "mk-subjcol"
-  }, "\u7B2C\u4E09\u89E3\u7B54"), React.createElement("th", null, "\u70B9"), React.createElement("th", {
+  }, "第三解答"), React.createElement("th", null, "点"), React.createElement("th", {
     className: "mk-subjcol"
-  }, "\u7B2C\u4E00\u89E3\u7B54"), React.createElement("th", null, "\u70B9"), React.createElement("th", {
+  }, "第一解答"), React.createElement("th", null, "点"), React.createElement("th", {
     className: "mk-subjcol"
-  }, "\u7B2C\u4E8C\u89E3\u7B54"), React.createElement("th", null, "\u70B9"))), React.createElement("tbody", null, rows.map((e, i) => React.createElement("tr", {
+  }, "第二解答"), React.createElement("th", null, "点"))), React.createElement("tbody", null, rows.map((e, i) => React.createElement("tr", {
     key: i,
     className: e.full ? '' : 'mk-partial'
   }, React.createElement("td", {
@@ -259,7 +259,7 @@ function MockExamCard({
     className: "mk-sticky mk-name"
   }, e.name, !e.full && React.createElement("span", {
     className: "mk-pill"
-  }, "\u82F1\u6570")), React.createElement("td", null, React.createElement(Num, {
+  }, "英数")), React.createElement("td", null, React.createElement(Num, {
     v: e.kokugo && e.kokugo.gendai
   })), React.createElement("td", null, React.createElement(Num, {
     v: e.kokugo && e.kokugo.koten
@@ -368,7 +368,7 @@ function MockExamCard({
       className: "mk-xcard-name"
     }, e.name, !e.full && React.createElement("span", {
       className: "mk-pill"
-    }, "\u82F1\u6570")), React.createElement("span", {
+    }, "英数")), React.createElement("span", {
       className: "mk-xcard-tot gv-num"
     }, e.total, React.createElement("small", null, "/ ", MOCK_FULL_MARKS))), React.createElement("div", {
       className: "mk-xcard-grid"
@@ -386,7 +386,7 @@ function MockExamCard({
     }))))));
   })), React.createElement("div", {
     className: "gt-note gt-note-soft"
-  }, "\u30DE\u30FC\u30AF\u6A21\u8A66(\u30D5\u30A9\u30FC\u30E0) \u30B7\u30FC\u30C8\u306E\u8A18\u9332\u3092\u65B0\u3057\u3044\u9806\u306B\u8868\u793A\u3002\u300C\u82F1\u6570\u300D\u306F\u56FD\u8A9E\u30FB\u7406\u79D1\u30FB\u793E\u4F1A\u3092\u542B\u307E\u306A\u3044\u6821\u5185\u30DE\u30FC\u30AF\u6A21\u8A66\u3067\u3059\u3002\u5FD7\u671B\u6821\u306F\u30D5\u30A9\u30FC\u30E0 I\u5217\u306E\u6700\u65B0\u56DE\u7B54\u3092\u63A1\u7528\u3057\u3066\u3044\u307E\u3059\u3002"));
+  }, "マーク模試(フォーム) シートの記録を新しい順に表示。「英数」は国語・理科・社会を含まない校内マーク模試です。志望校はフォーム I列の最新回答を採用しています。"));
 }
 function StudentDetailScreen({
   nav,
@@ -464,7 +464,7 @@ function StudentDetailScreen({
     }, React.createElement("button", {
       className: "tw-back",
       onClick: () => nav('back')
-    }, Icon.chevL(14), " \u4E00\u89A7\u3078\u623B\u308B"), React.createElement("h1", {
+    }, Icon.chevL(14), " 一覧へ戻る"), React.createElement("h1", {
       className: "tw-detail-title",
       style: {
         marginBottom: 18
@@ -488,18 +488,18 @@ function StudentDetailScreen({
       className: "tw-loadwrap"
     }, React.createElement("div", {
       className: "spinner"
-    }), React.createElement("span", null, "\u6210\u7E3E\u30C7\u30FC\u30BF\u3092\u8AAD\u307F\u8FBC\u307F\u4E2D\u2026")), state === 'empty' && React.createElement("div", {
+    }), React.createElement("span", null, "成績データを読み込み中…")), state === 'empty' && React.createElement("div", {
       className: "tw-empty"
     }, React.createElement("div", {
       className: "tw-empty-ic"
     }, Icon.chart(26)), React.createElement("div", {
       className: "tw-empty-t1"
-    }, "\u307E\u3060\u6210\u7E3E\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093"), React.createElement("div", {
+    }, "まだ成績データがありません"), React.createElement("div", {
       className: "tw-empty-t2"
-    }, "\u3053\u306E\u751F\u5F92\u306E\u70B9\u6570\u5831\u544A\u304C\u767B\u9332\u3055\u308C\u308B\u3068\u3001\u3053\u3053\u306B\u63A8\u79FB\u304C\u8868\u793A\u3055\u308C\u307E\u3059\u3002"), React.createElement("button", {
+    }, "この生徒の点数報告が登録されると、ここに推移が表示されます。"), React.createElement("button", {
       className: "btn btn-primary btn-sm",
       onClick: () => nav('back')
-    }, "\u4E00\u89A7\u3078\u623B\u308B")), state === 'error' && React.createElement("div", {
+    }, "一覧へ戻る")), state === 'error' && React.createElement("div", {
       className: "tw-empty"
     }, React.createElement("div", {
       className: "tw-empty-ic",
@@ -509,16 +509,16 @@ function StudentDetailScreen({
       }
     }, Icon.alert(26)), React.createElement("div", {
       className: "tw-empty-t1"
-    }, "\u30C7\u30FC\u30BF\u3092\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F"), React.createElement("div", {
+    }, "データを取得できませんでした"), React.createElement("div", {
       className: "tw-empty-t2"
-    }, "\u901A\u4FE1\u74B0\u5883\u3092\u78BA\u8A8D\u3057\u3066\u3001\u3082\u3046\u4E00\u5EA6\u304A\u8A66\u3057\u304F\u3060\u3055\u3044\u3002"), React.createElement("button", {
+    }, "通信環境を確認して、もう一度お試しください。"), React.createElement("button", {
       className: "btn btn-quiet btn-sm",
       onClick: () => {}
     }, Icon.refresh(16), React.createElement("span", {
       style: {
         marginLeft: 6
       }
-    }, "\u3082\u3046\u4E00\u5EA6\u8A66\u3059"))));
+    }, "もう一度試す"))));
   }
   return React.createElement("div", {
     className: "tw-main tw-detail"
@@ -527,16 +527,19 @@ function StudentDetailScreen({
   }, React.createElement("button", {
     className: "tw-back",
     onClick: () => nav('back')
-  }, Icon.chevL(14), " \u4E00\u89A7\u3078\u623B\u308B"), React.createElement("div", {
+  }, Icon.chevL(14), " 一覧へ戻る"), React.createElement("div", {
     className: "gv-print-bar"
   }, React.createElement("button", {
+    className: "sb-open-btn",
+    onClick: () => nav('shibou', name)
+  }, Icon.flag ? Icon.flag(14) : null, React.createElement("span", null, "おすすめ志望校")), React.createElement("button", {
     className: "gv-print-btn",
     onClick: onPrintPDF
-  }, "PDF\u51FA\u529B\uFF08B4\u30FB\u6A2A\uFF09"))), React.createElement("div", {
+  }, "PDF出力（B4・横）"))), React.createElement("div", {
     className: "tw-detail-head"
   }, React.createElement("div", null, React.createElement("div", {
     className: "tw-eyebrow"
-  }, "REPORT \xB7 \u6210\u7E3E\u63A8\u79FB"), React.createElement("h1", {
+  }, "REPORT · 成績推移"), React.createElement("h1", {
     className: "tw-detail-title"
   }, name, React.createElement("span", {
     className: "grade"
@@ -544,9 +547,9 @@ function StudentDetailScreen({
     className: "tw-detail-meta"
   }, React.createElement("span", {
     className: "tw-hr-chip"
-  }, "\u62C5\u4EFB ", det.homeroom, " \u5148\u751F"), det.mock && det.mock.aspiration && React.createElement("span", {
+  }, "担任 ", det.homeroom, " 先生"), det.mock && det.mock.aspiration && React.createElement("span", {
     className: "tw-asp-inline"
-  }, Icon.flag ? Icon.flag(13) : null, "\u5FD7\u671B\u6821 ", React.createElement("b", null, det.mock.aspiration)))), React.createElement("div", {
+  }, Icon.flag ? Icon.flag(13) : null, "志望校 ", React.createElement("b", null, det.mock.aspiration)))), React.createElement("div", {
     className: "tw-detail-right"
   }, React.createElement("div", {
     className: "tw-detail-en"
@@ -558,7 +561,7 @@ function StudentDetailScreen({
     className: "tw-subject-section"
   }, React.createElement("div", {
     className: "tw-eyebrow tw-subject-eyebrow"
-  }, "\u79D1\u76EE\u5225\u306E\u6210\u7E3E\u63A8\u79FB"), React.createElement("div", {
+  }, "科目別の成績推移"), React.createElement("div", {
     className: subjectUI === 'segmented' ? 'gt-seg' : 'tw-subjtabs',
     style: subjectUI === 'segmented' ? {
       maxWidth: 360,
@@ -596,7 +599,7 @@ function StudentDetailScreen({
     className: "gt-card-head"
   }, React.createElement("div", {
     className: "gt-card-title"
-  }, "\u5408\u8A08\u70B9\u306E\u63A8\u79FB"), React.createElement("div", {
+  }, "合計点の推移"), React.createElement("div", {
     className: "gt-card-aux gv-en"
   }, tt.length, " TESTS")), React.createElement("div", {
     className: "gt-summary"
@@ -604,13 +607,13 @@ function StudentDetailScreen({
     className: "gt-sum-main"
   }, React.createElement("div", {
     className: "gt-sum-k"
-  }, "\u76F4\u8FD1"), React.createElement("div", {
+  }, "直近"), React.createElement("div", {
     className: "gt-sum-v"
   }, React.createElement("span", {
     className: "gv-num"
   }, fmt1(latest.total)), React.createElement("span", {
     className: "gt-sum-u"
-  }, "\u70B9")), prev && React.createElement("div", {
+  }, "点")), prev && React.createElement("div", {
     className: `gt-sum-delta ${delta >= 0 ? 'up' : 'down'}`
   }, delta >= 0 ? '▲' : '▼', " ", React.createElement("span", {
     className: "gv-num"
@@ -620,13 +623,13 @@ function StudentDetailScreen({
     className: "gt-sum-cell"
   }, React.createElement("span", {
     className: "k"
-  }, "\u5E73\u5747"), React.createElement("span", {
+  }, "平均"), React.createElement("span", {
     className: "v gv-num"
   }, fmt1(latest.avg))), React.createElement("div", {
     className: "gt-sum-cell acc"
   }, React.createElement("span", {
     className: "k"
-  }, "\u504F\u5DEE\u5024"), React.createElement("span", {
+  }, "偏差値"), React.createElement("span", {
     className: "v gv-num"
   }, fmt1(latest.hensachi))))), tt.length > 14 && React.createElement("div", {
     className: "gt-range"
@@ -636,7 +639,7 @@ function StudentDetailScreen({
     onClick: () => setRange(v)
   }, lb)), React.createElement("span", {
     className: "gt-range-count gv-num"
-  }, view.length, " / ", tt.length, " \u4EF6")), view.length >= 2 ? React.createElement(React.Fragment, null, React.createElement(Measured, {
+  }, view.length, " / ", tt.length, " 件")), view.length >= 2 ? React.createElement(React.Fragment, null, React.createElement(Measured, {
     h: 220
   }, w => React.createElement(TotalTrendChart, {
     points: view,
@@ -647,28 +650,28 @@ function StudentDetailScreen({
     className: "gt-leg"
   }, React.createElement("span", {
     className: "gt-leg-line main"
-  }), "\u5408\u8A08\u70B9"), React.createElement("span", {
+  }), "合計点"), React.createElement("span", {
     className: "gt-leg"
   }, React.createElement("span", {
     className: "gt-leg-line dash"
-  }), "\u5E73\u5747\u70B9"), React.createElement("span", {
+  }), "平均点"), React.createElement("span", {
     className: "gt-leg"
   }, React.createElement("span", {
     className: "gt-leg-line acc"
-  }), "\u504F\u5DEE\u5024 ", React.createElement("span", {
+  }), "偏差値 ", React.createElement("span", {
     className: "gv-en",
     style: {
       opacity: .6
     }
-  }, "(\u53F3\u8EF8)")))) : React.createElement("div", {
+  }, "(右軸)")))) : React.createElement("div", {
     className: "gt-note"
-  }, "\u30C7\u30FC\u30BF\u304C ", view.length, " \u4EF6\u306E\u305F\u3081\u3001\u63A8\u79FB\u30B0\u30E9\u30D5\u306F2\u4EF6\u4EE5\u4E0A\u3067\u8868\u793A\u3055\u308C\u307E\u3059\u3002"), React.createElement("div", {
+  }, "データが ", view.length, " 件のため、推移グラフは2件以上で表示されます。"), React.createElement("div", {
     className: "gt-tests"
   }, React.createElement("div", {
     className: "gt-tests-h"
-  }, React.createElement("span", null, "\u30C6\u30B9\u30C8\u3054\u3068\u306E\u8A18\u9332"), React.createElement("span", {
+  }, React.createElement("span", null, "テストごとの記録"), React.createElement("span", {
     className: "gt-tests-count gv-num"
-  }, "\u5168 ", tt.length, " \u4EF6")), React.createElement("div", {
+  }, "全 ", tt.length, " 件")), React.createElement("div", {
     className: "gt-scroll"
   }, [...tt].reverse().map((p, i) => React.createElement("div", {
     key: i,
@@ -679,19 +682,19 @@ function StudentDetailScreen({
     className: "gt-test-name"
   }, p.test), React.createElement("span", {
     className: "gt-test-score gv-num"
-  }, fmt1(p.total), React.createElement("small", null, "\u70B9")), React.createElement("span", {
+  }, fmt1(p.total), React.createElement("small", null, "点")), React.createElement("span", {
     className: "gt-test-hen gv-num"
-  }, "\u504F ", fmt1(p.hensachi))))))), React.createElement("div", {
+  }, "偏 ", fmt1(p.hensachi))))))), React.createElement("div", {
     className: "gt-card"
   }, React.createElement("div", {
     className: "gt-card-head"
   }, React.createElement("div", {
     className: "gt-card-title"
-  }, "\u5206\u91CE\u5225\u306E\u63A8\u79FB", React.createElement("span", {
+  }, "分野別の推移", React.createElement("span", {
     className: "gt-card-title-sub"
-  }, "\u6708\u6B21\u5E73\u5747")), React.createElement("div", {
+  }, "月次平均")), React.createElement("div", {
     className: "gt-card-aux gv-en"
-  }, d.fields.length, " \u5206\u91CE")), React.createElement("div", {
+  }, d.fields.length, " 分野")), React.createElement("div", {
     className: "gt-vchips"
   }, [['lines', '折れ線'], ['strengths', '得点傾向']].map(([v, lb]) => React.createElement("button", {
     key: v,
@@ -704,13 +707,13 @@ function StudentDetailScreen({
   }, React.createElement("button", {
     className: "gt-preset",
     onClick: () => setSel(new Set(defaultFields(det, subject)))
-  }, "\u5F37\u5F316"), React.createElement("button", {
+  }, "強弱6"), React.createElement("button", {
     className: "gt-preset",
     onClick: () => setSel(new Set(d.fields))
-  }, "\u5168\u3066"), React.createElement("button", {
+  }, "全て"), React.createElement("button", {
     className: "gt-preset",
     onClick: () => setSel(new Set())
-  }, "\u30AF\u30EA\u30A2"), React.createElement("span", {
+  }, "クリア"), React.createElement("span", {
     className: "gt-presets-count gv-num"
   }, sel.size, "/", d.fields.length)), React.createElement(Measured, {
     h: 220
@@ -724,22 +727,22 @@ function StudentDetailScreen({
     className: "gt-leg"
   }, React.createElement("span", {
     className: "gt-leg-line solid-n"
-  }), "\u5F97\u70B9\u7387"), React.createElement("span", {
+  }), "得点率"), React.createElement("span", {
     className: "gt-leg"
   }, React.createElement("span", {
     className: "gt-leg-line dash-n"
-  }), "\u5E73\u5747\u5F97\u70B9\u7387"), React.createElement("span", {
+  }), "平均得点率"), React.createElement("span", {
     className: "gt-leg"
   }, React.createElement("span", {
     className: "gt-leg-line thin-n"
-  }), "\u504F\u5DEE\u5024 ", React.createElement("span", {
+  }), "偏差値 ", React.createElement("span", {
     className: "gv-en",
     style: {
       opacity: .6
     }
-  }, "(\u53F3\u8EF8)")), React.createElement("span", {
+  }, "(右軸)")), React.createElement("span", {
     className: "gt-leg gt-leg-note"
-  }, "\u7DDA\u306E\u8272\uFF1D\u5206\u91CE")), React.createElement("div", {
+  }, "線の色＝分野")), React.createElement("div", {
     className: "gt-fieldchips"
   }, d.fields.map(f => {
     const on = sel.has(f);
@@ -766,9 +769,9 @@ function StudentDetailScreen({
     className: "gt-fd"
   }, React.createElement("div", {
     className: "gt-tests-h"
-  }, React.createElement("span", null, "\u5206\u91CE\u3054\u3068\u306E\u6708\u6B21"), React.createElement("span", {
+  }, React.createElement("span", null, "分野ごとの月次"), React.createElement("span", {
     className: "gt-tests-count gv-num"
-  }, "\u5F97\u70B9\u7387 \xB7 \u504F\u5DEE\u5024 / ", order.length, " \u5206\u91CE")), order.length ? React.createElement("div", {
+  }, "得点率 · 偏差値 / ", order.length, " 分野")), order.length ? React.createElement("div", {
     className: "gt-scroll"
   }, order.map(f => {
     const c = colorForField(det, subject, f);
@@ -800,12 +803,12 @@ function StudentDetailScreen({
       className: "gt-fd-rate gv-num"
     }, fmt1(d.rate[f][i]), React.createElement("small", null, "%")), React.createElement("span", {
       className: "gt-fd-hen gv-num"
-    }, "\u504F ", fmt1(d.hensachi[f][i])))));
+    }, "偏 ", fmt1(d.hensachi[f][i])))));
   })) : React.createElement("div", {
     className: "gt-note gt-note-soft"
-  }, "\u5206\u91CE\u3092\u9078\u629E\u3059\u308B\u3068\u3001\u6708\u6BCE\u306E\u5F97\u70B9\u7387\u30FB\u504F\u5DEE\u5024\u304C\u4E00\u89A7\u8868\u793A\u3055\u308C\u307E\u3059\u3002")), React.createElement("div", {
+  }, "分野を選択すると、月毎の得点率・偏差値が一覧表示されます。")), React.createElement("div", {
     className: "gt-note gt-note-soft"
-  }, "\u30C1\u30C3\u30D7\u3092\u30AF\u30EA\u30C3\u30AF\u3067\u5206\u91CE\u306E\u7DDA\u3092\u8868\u793A\uFF0F\u975E\u8868\u793A\u3002\u521D\u671F\u306F\u76F4\u8FD1\u6708\u306E\u4E0A\u4F4D3\u30FB\u4E0B\u4F4D3\u5206\u91CE\u3002")), fv === 'strengths' && React.createElement(React.Fragment, null, React.createElement("div", {
+  }, "チップをクリックで分野の線を表示／非表示。初期は直近月の上位3・下位3分野。")), fv === 'strengths' && React.createElement(React.Fragment, null, React.createElement("div", {
     className: "gt-seg gt-seg-sm"
   }, METRICS.filter(m => m.key !== 'avgRate').map(m => React.createElement("button", {
     key: m.key,
@@ -819,7 +822,7 @@ function StudentDetailScreen({
     className: "gt-sw-h"
   }, React.createElement("span", {
     className: "gt-sw-badge strong"
-  }, "\u5F97\u610F"), "\u76F4\u8FD1\u306E\u4E0A\u4F4D", cnt), strong.map(({
+  }, "得意"), "直近の上位", cnt), strong.map(({
     f,
     v,
     prev
@@ -844,7 +847,7 @@ function StudentDetailScreen({
     className: "gt-sw-h"
   }, React.createElement("span", {
     className: "gt-sw-badge weak"
-  }, "\u82E6\u624B"), "\u76F4\u8FD1\u306E\u4E0B\u4F4D", cnt), weak.map(({
+  }, "苦手"), "直近の下位", cnt), weak.map(({
     f,
     v,
     prev
@@ -868,7 +871,230 @@ function StudentDetailScreen({
     style: {
       marginTop: 14
     }
-  }, "\u5F97\u70B9\u50BE\u5411\u306F\u300C\u76F4\u8FD1\u306E\u5024\u304C\u3042\u308B\u6708\u300D\u3067\u5224\u5B9A\u3002\u5E73\u5747\u5F97\u70B9\u7387\u306F\u30AF\u30E9\u30B9\u96E3\u6613\u5EA6\u306E\u6307\u6A19\u306E\u305F\u3081\u3001\u3053\u306E\u8868\u793A\u3067\u306F\u9664\u5916\u3057\u3066\u3044\u307E\u3059\u3002")))));
+  }, "得点傾向は「直近の値がある月」で判定。平均得点率はクラス難易度の指標のため、この表示では除外しています。")))));
+}
+function sbBandMeta(raw) {
+  const b = raw || '';
+  if (b.indexOf('安全') >= 0) return {
+    label: '安全',
+    sub: '合格圏',
+    accent: '#4e9b73',
+    soft: 'rgba(78,155,115,0.14)',
+    ink: '#2f7d52'
+  };
+  if (b.indexOf('適正') >= 0) return {
+    label: '適正',
+    sub: '実力相応',
+    accent: '#7aa84a',
+    soft: 'rgba(120,170,90,0.16)',
+    ink: '#5a7d2a'
+  };
+  if (b.indexOf('挑戦') >= 0) return {
+    label: '挑戦',
+    sub: 'やや上',
+    accent: '#e0883c',
+    soft: 'rgba(224,136,60,0.16)',
+    ink: '#b5642a'
+  };
+  if (b.indexOf('再考') >= 0) return {
+    label: '要再考',
+    sub: '現状は厳しい',
+    accent: '#c95b5b',
+    soft: 'rgba(201,91,91,0.14)',
+    ink: '#a13b3b'
+  };
+  if (b.indexOf('推薦') >= 0) return {
+    label: '推薦',
+    sub: '別ルート',
+    accent: '#5b7fa1',
+    soft: 'rgba(91,127,161,0.14)',
+    ink: '#3f6088'
+  };
+  return {
+    label: '判定保留',
+    sub: '模試成績が未登録',
+    accent: '#a7a79c',
+    soft: 'rgba(120,120,110,0.12)',
+    ink: '#777'
+  };
+}
+function sbNum(v) {
+  if (v === '' || v == null) return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}
+function SbBar({
+  you,
+  line,
+  accent
+}) {
+  if (you == null) return null;
+  const c = n => Math.max(0, Math.min(100, n));
+  return React.createElement("div", {
+    className: "sb-bar"
+  }, React.createElement("div", {
+    className: "sb-track"
+  }, React.createElement("div", {
+    className: "sb-fill",
+    style: {
+      width: c(you) + '%',
+      background: accent
+    }
+  }), line != null && React.createElement("div", {
+    className: "sb-linemark",
+    style: {
+      left: c(line) + '%'
+    }
+  })), React.createElement("div", {
+    className: "sb-barlab"
+  }, React.createElement("span", {
+    style: {
+      color: accent,
+      fontWeight: 700
+    }
+  }, "本人 ", you, "%"), line != null && React.createElement("span", {
+    className: "sb-linelab"
+  }, "合格ライン ", line, "%")));
+}
+function ShibouScreen({
+  nav,
+  name
+}) {
+  const [st, setSt] = React.useState('loading');
+  const [rows, setRows] = React.useState([]);
+  React.useEffect(() => {
+    let alive = true;
+    setSt('loading');
+    const apply = res => {
+      if (!alive) return;
+      if (res.status === 'ok') {
+        setRows(res.results || []);
+        setSt((res.results || []).length ? 'ok' : 'empty');
+      } else if (res.status === 'empty') {
+        setRows([]);
+        setSt('empty');
+      } else if (res.status === 'error') {
+        setSt('error');
+      } else setSt('error');
+    };
+    GVApi.fetchShibou(name, {
+      onRevalidate: apply
+    }).then(apply).catch(() => {
+      if (alive) setSt('error');
+    });
+    return () => {
+      alive = false;
+    };
+  }, [name]);
+  return React.createElement("div", {
+    className: "tw-main tw-detail"
+  }, React.createElement("div", {
+    className: "tw-detail-topbar"
+  }, React.createElement("button", {
+    className: "tw-back",
+    onClick: () => nav('student', name)
+  }, Icon.chevL(14), " 成績へ戻る")), React.createElement("div", {
+    className: "tw-detail-head"
+  }, React.createElement("div", null, React.createElement("div", {
+    className: "tw-eyebrow"
+  }, "RECOMMEND · おすすめ志望校"), React.createElement("h1", {
+    className: "tw-detail-title"
+  }, name), React.createElement("div", {
+    className: "tw-detail-meta"
+  }, React.createElement("span", {
+    className: "tw-hr-chip"
+  }, "生徒アプリに表示中の調査結果と同じ内容")))), st === 'loading' && React.createElement("div", {
+    className: "tw-loadwrap"
+  }, React.createElement("div", {
+    className: "spinner"
+  }), React.createElement("span", null, "志望校の調査結果を読み込み中…")), st === 'error' && React.createElement("div", {
+    className: "tw-empty"
+  }, React.createElement("div", {
+    className: "tw-empty-ic",
+    style: {
+      background: 'var(--c-accent-soft)',
+      color: '#9A4309'
+    }
+  }, Icon.alert(26)), React.createElement("div", {
+    className: "tw-empty-t1"
+  }, "取得できませんでした"), React.createElement("div", {
+    className: "tw-empty-t2"
+  }, "通信環境を確認して、もう一度お試しください。"), React.createElement("button", {
+    className: "btn btn-quiet btn-sm",
+    onClick: () => nav('shibou', name)
+  }, Icon.refresh(16), React.createElement("span", {
+    style: {
+      marginLeft: 6
+    }
+  }, "もう一度試す"))), st === 'empty' && React.createElement("div", {
+    className: "tw-empty"
+  }, React.createElement("div", {
+    className: "tw-empty-ic"
+  }, Icon.flag ? Icon.flag(24) : Icon.chart(26)), React.createElement("div", {
+    className: "tw-empty-t1"
+  }, "まだ調査結果がありません"), React.createElement("div", {
+    className: "tw-empty-t2"
+  }, "この生徒が生徒用アプリで「志望校調査を依頼」し、エージェントの調査が完了すると、ここに表示されます。"), React.createElement("button", {
+    className: "btn btn-primary btn-sm",
+    onClick: () => nav('student', name)
+  }, "成績へ戻る")), st === 'ok' && React.createElement("div", {
+    className: "sb-list"
+  }, rows.map((r, i) => {
+    const m = sbBandMeta(String(r['判定'] || ''));
+    const you = sbNum(r['傾斜後得点率']);
+    const line = sbNum(r['ボーダー']);
+    const dept = r['学部学科/日程'] || r['学部学科・日程'] || r['学部学科'] || '';
+    return React.createElement("div", {
+      key: i,
+      className: "sb-card",
+      style: {
+        borderLeft: '5px solid ' + m.accent
+      }
+    }, React.createElement("div", {
+      className: "sb-top"
+    }, React.createElement("div", {
+      className: "sb-rank"
+    }, r['順位'] != null && r['順位'] !== '' ? r['順位'] : i + 1), React.createElement("div", {
+      className: "sb-titles"
+    }, React.createElement("div", {
+      className: "sb-school"
+    }, r['大学']), React.createElement("div", {
+      className: "sb-dept"
+    }, dept)), React.createElement("div", {
+      className: "sb-band",
+      style: {
+        background: m.accent
+      }
+    }, React.createElement("div", {
+      className: "sb-band-l"
+    }, m.label), React.createElement("div", {
+      className: "sb-band-s"
+    }, m.sub))), React.createElement(SbBar, {
+      you: you,
+      line: line,
+      accent: m.accent
+    }), r['研究適合'] && React.createElement("div", {
+      className: "sb-block"
+    }, React.createElement("div", {
+      className: "sb-block-h"
+    }, "研究内容"), React.createElement("div", {
+      className: "sb-block-b"
+    }, r['研究適合'])), r['注意'] && React.createElement("div", {
+      className: "sb-block",
+      style: {
+        background: m.soft
+      }
+    }, React.createElement("div", {
+      className: "sb-block-h",
+      style: {
+        color: m.ink
+      }
+    }, "注意"), React.createElement("div", {
+      className: "sb-block-b"
+    }, r['注意'])));
+  }), React.createElement("p", {
+    className: "sb-foot"
+  }, "※ 生徒用アプリに表示されているものと同じ内容です。研究内容を最優先に選定し、判定（得点の目安）は参考値です。")));
 }
 Object.assign(window, {
   StudentDetailScreen

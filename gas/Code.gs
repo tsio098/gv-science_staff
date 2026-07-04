@@ -7,6 +7,7 @@
  *  エンドポイント（すべて GET / クエリ token 必須）:
  *    ?action=students&token=...            … 生徒一覧の軽量サマリー
  *    ?action=scores&name=<生徒名>&token=... … 生徒1人の詳細（演習＋マーク模試）
+ *    ?action=shibouResults&name=<生徒名>&token=... … 生徒1人の「おすすめ志望校」（生徒用アプリと同内容）
  *    （&fresh=1 でサーバキャッシュを無視して取り直す）
  *
  *  ── 設定（CONFIG）──────────────────────────────────────────────
@@ -72,12 +73,21 @@ var ROSTER = {
   // 実ヘッダー：A:名前 / B:USERID / C:学年 / D:ID / E:理科使用科目 / F:担任
   COL: {
     name:     1,       // 名前（A列）
+    userid:   2,       // USERID（B列）＝LINE userId。志望校調査(結果)の照合キー。
     grade:    3,       // 学年（C列）"既卒"/"高校3年生" 等
     subjects: 5,       // 理科使用科目（E列）"化学,生物" 等。物理は成績シートが無いため自動で無視。
     homeroom: 6,       // 担任（F列）
   },
   // E列がこれらの値（または空白）の生徒は一覧対象から除外（読み込み段階でスキップ）。
   SKIP_SUBJECT_TOKENS: ['未回答', '未記入', 'なし', '使用しない', '-', '—'],
+};
+
+/* ── ★ 志望校調査(結果)シート。生徒用アプリ「おすすめ志望校」と同じ内容を先生画面へ。
+ *  GV Science DB（= ROSTER_SPREADSHEET_ID）内の同名シート。エージェントが USERID で書き込む。
+ *  ヘッダー：USERID / 調査日 / 順位 / 大学 / 学部学科/日程 / 判定 / 傾斜後得点率 / ボーダー / 研究適合 / 注意 / item_id */
+var SHIBOU = {
+  RESULTS_SHEET: '志望校調査',
+  ID_HEADER: 'USERID',
 };
 
 /* ── ★ マーク模試(フォーム)シートの列マップ（1始まり）─────────────
@@ -191,6 +201,10 @@ function doGet(e) {
     if (action === 'scores') {
       if (!p.name) return json_({ error: 'NO_DATA' });
       return json_(getDetail_(p.name, fresh));
+    }
+    if (action === 'shibouResults') {
+      if (!p.name) return json_({ error: 'NO_DATA' });
+      return json_(getShibou_(p.name));
     }
     return json_({ error: 'BAD_ACTION' });
   } catch (err) {
@@ -820,6 +834,52 @@ function readNum_(rowArr, fmtArr, col1) {
   var fmt = String((fmtArr && fmtArr[idx]) || '');
   if (fmt.indexOf('%') >= 0) v = v * 100;
   return v;
+}
+
+/* ===================== SHIBOU (おすすめ志望校・先生閲覧) =====================
+ * 生徒用アプリの「おすすめ志望校」と同じ内容を、氏名から引いて返す。
+ *  ① 生徒IDシートで 氏名 → USERID を解決（実名解決はサーバ内で完結）。
+ *  ② 同スプレッドシートの「志望校調査」シートを USERID で絞り、順位昇順で返す。
+ * 返却は表示用フィールドのみ（USERID は返さない）。結果が無ければ { error:'NO_DATA' }。 */
+function getShibou_(name) {
+  var uid = resolveUserIdByName_(name);
+  if (!uid) return { error: 'NO_DATA' };
+  var sh = getSheet_(CONFIG.ROSTER_SPREADSHEET_ID, SHIBOU.RESULTS_SHEET);
+  if (!sh || sh.getLastRow() < 2) return { error: 'NO_DATA' };
+  var vals = sh.getDataRange().getValues();
+  var headers = vals[0].map(function (h) { return String(h).trim(); });
+  var idCol = headers.indexOf(SHIBOU.ID_HEADER);
+  if (idCol < 0) return { error: 'NO_DATA' };
+  var results = [];
+  for (var i = 1; i < vals.length; i++) {
+    if (String(vals[i][idCol] || '').trim() !== uid) continue;
+    var obj = {};
+    for (var c = 0; c < headers.length; c++) {
+      if (!headers[c] || headers[c] === SHIBOU.ID_HEADER) continue; // ★USERIDは返さない
+      var v = vals[i][c];
+      obj[headers[c]] = (v instanceof Date) ? fmtAny_(v) : v;
+    }
+    results.push(obj);
+  }
+  if (!results.length) return { error: 'NO_DATA' };
+  results.sort(function (a, b) { return (Number(a['順位']) || 999) - (Number(b['順位']) || 999); });
+  return { results: results };
+}
+
+/* 氏名 → USERID（生徒IDシート A列=名前 / B列=USERID）。空白除去で照合、下＝最新を優先。 */
+function resolveUserIdByName_(name) {
+  var sh = getSheet_(CONFIG.ROSTER_SPREADSHEET_ID, ROSTER.SHEET);
+  if (!sh) return '';
+  var lastRow = sh.getLastRow();
+  if (lastRow <= ROSTER.HEADER_ROWS) return '';
+  var vals = sh.getRange(ROSTER.HEADER_ROWS + 1, 1, lastRow - ROSTER.HEADER_ROWS, ROSTER.COL.userid).getValues();
+  var target = normName_(name);
+  for (var i = vals.length - 1; i >= 0; i--) {
+    if (normName_(cell_(vals[i], ROSTER.COL.name)) !== target) continue;
+    var uid = String(cell_(vals[i], ROSTER.COL.userid) || '').trim();
+    if (uid) return uid;
+  }
+  return '';
 }
 
 /* ===================== ROSTER (生徒IDシート) ===================== */

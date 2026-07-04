@@ -348,6 +348,7 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
       <div className="tw-detail-topbar">
         <button className="tw-back" onClick={() => nav('back')}>{Icon.chevL(14)} 一覧へ戻る</button>
         <div className="gv-print-bar">
+          <button className="sb-open-btn" onClick={() => nav('shibou', name)}>{Icon.flag ? Icon.flag(14) : null}<span>おすすめ志望校</span></button>
           <button className="gv-print-btn" onClick={onPrintPDF}>PDF出力（B4・横）</button>
         </div>
       </div>
@@ -557,6 +558,128 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
       </div>
     </div>);
 
+}
+
+/* ============================================================================
+ *  ShibouScreen — 先生用「おすすめ志望校」。生徒用アプリ(ShibouResultsScreen)と同じ設計。
+ *  GAS `shibouResults`（氏名→USERIDはGAS内で解決）を自前取得してカード表示する。
+ * ========================================================================== */
+function sbBandMeta(raw) {
+  const b = raw || '';
+  if (b.indexOf('安全') >= 0) return { label: '安全', sub: '合格圏', accent: '#4e9b73', soft: 'rgba(78,155,115,0.14)', ink: '#2f7d52' };
+  if (b.indexOf('適正') >= 0) return { label: '適正', sub: '実力相応', accent: '#7aa84a', soft: 'rgba(120,170,90,0.16)', ink: '#5a7d2a' };
+  if (b.indexOf('挑戦') >= 0) return { label: '挑戦', sub: 'やや上', accent: '#e0883c', soft: 'rgba(224,136,60,0.16)', ink: '#b5642a' };
+  if (b.indexOf('再考') >= 0) return { label: '要再考', sub: '現状は厳しい', accent: '#c95b5b', soft: 'rgba(201,91,91,0.14)', ink: '#a13b3b' };
+  if (b.indexOf('推薦') >= 0) return { label: '推薦', sub: '別ルート', accent: '#5b7fa1', soft: 'rgba(91,127,161,0.14)', ink: '#3f6088' };
+  return { label: '判定保留', sub: '模試成績が未登録', accent: '#a7a79c', soft: 'rgba(120,120,110,0.12)', ink: '#777' };
+}
+function sbNum(v) {
+  if (v === '' || v == null) return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}
+function SbBar({ you, line, accent }) {
+  if (you == null) return null;
+  const c = (n) => Math.max(0, Math.min(100, n));
+  return (
+    <div className="sb-bar">
+      <div className="sb-track">
+        <div className="sb-fill" style={{ width: c(you) + '%', background: accent }} />
+        {line != null && <div className="sb-linemark" style={{ left: c(line) + '%' }} />}
+      </div>
+      <div className="sb-barlab">
+        <span style={{ color: accent, fontWeight: 700 }}>本人 {you}%</span>
+        {line != null && <span className="sb-linelab">合格ライン {line}%</span>}
+      </div>
+    </div>
+  );
+}
+function ShibouScreen({ nav, name }) {
+  const [st, setSt] = React.useState('loading'); // loading|ok|empty|error
+  const [rows, setRows] = React.useState([]);
+  React.useEffect(() => {
+    let alive = true;
+    setSt('loading');
+    const apply = (res) => {
+      if (!alive) return;
+      if (res.status === 'ok') { setRows(res.results || []); setSt((res.results || []).length ? 'ok' : 'empty'); }
+      else if (res.status === 'empty') { setRows([]); setSt('empty'); }
+      else if (res.status === 'error') { setSt('error'); }
+      // unauthorized は稀（閲覧中は認証済）。エラー扱いで再試行導線を出す。
+      else setSt('error');
+    };
+    GVApi.fetchShibou(name, { onRevalidate: apply })
+      .then(apply)
+      .catch(() => { if (alive) setSt('error'); });
+    return () => { alive = false; };
+  }, [name]);
+
+  return (
+    <div className="tw-main tw-detail">
+      <div className="tw-detail-topbar">
+        <button className="tw-back" onClick={() => nav('student', name)}>{Icon.chevL(14)} 成績へ戻る</button>
+      </div>
+      <div className="tw-detail-head">
+        <div>
+          <div className="tw-eyebrow">RECOMMEND · おすすめ志望校</div>
+          <h1 className="tw-detail-title">{name}</h1>
+          <div className="tw-detail-meta">
+            <span className="tw-hr-chip">生徒アプリに表示中の調査結果と同じ内容</span>
+          </div>
+        </div>
+      </div>
+
+      {st === 'loading' &&
+        <div className="tw-loadwrap"><div className="spinner" /><span>志望校の調査結果を読み込み中…</span></div>}
+
+      {st === 'error' &&
+        <div className="tw-empty">
+          <div className="tw-empty-ic" style={{ background: 'var(--c-accent-soft)', color: '#9A4309' }}>{Icon.alert(26)}</div>
+          <div className="tw-empty-t1">取得できませんでした</div>
+          <div className="tw-empty-t2">通信環境を確認して、もう一度お試しください。</div>
+          <button className="btn btn-quiet btn-sm" onClick={() => nav('shibou', name)}>{Icon.refresh(16)}<span style={{ marginLeft: 6 }}>もう一度試す</span></button>
+        </div>}
+
+      {st === 'empty' &&
+        <div className="tw-empty">
+          <div className="tw-empty-ic">{Icon.flag ? Icon.flag(24) : Icon.chart(26)}</div>
+          <div className="tw-empty-t1">まだ調査結果がありません</div>
+          <div className="tw-empty-t2">この生徒が生徒用アプリで「志望校調査を依頼」し、エージェントの調査が完了すると、ここに表示されます。</div>
+          <button className="btn btn-primary btn-sm" onClick={() => nav('student', name)}>成績へ戻る</button>
+        </div>}
+
+      {st === 'ok' &&
+        <div className="sb-list">
+          {rows.map((r, i) => {
+            const m = sbBandMeta(String(r['判定'] || ''));
+            const you = sbNum(r['傾斜後得点率']);
+            const line = sbNum(r['ボーダー']);
+            const dept = r['学部学科/日程'] || r['学部学科・日程'] || r['学部学科'] || '';
+            return (
+              <div key={i} className="sb-card" style={{ borderLeft: '5px solid ' + m.accent }}>
+                <div className="sb-top">
+                  <div className="sb-rank">{r['順位'] != null && r['順位'] !== '' ? r['順位'] : i + 1}</div>
+                  <div className="sb-titles">
+                    <div className="sb-school">{r['大学']}</div>
+                    <div className="sb-dept">{dept}</div>
+                  </div>
+                  <div className="sb-band" style={{ background: m.accent }}>
+                    <div className="sb-band-l">{m.label}</div>
+                    <div className="sb-band-s">{m.sub}</div>
+                  </div>
+                </div>
+                <SbBar you={you} line={line} accent={m.accent} />
+                {r['研究適合'] &&
+                  <div className="sb-block"><div className="sb-block-h">研究内容</div><div className="sb-block-b">{r['研究適合']}</div></div>}
+                {r['注意'] &&
+                  <div className="sb-block" style={{ background: m.soft }}><div className="sb-block-h" style={{ color: m.ink }}>注意</div><div className="sb-block-b">{r['注意']}</div></div>}
+              </div>
+            );
+          })}
+          <p className="sb-foot">※ 生徒用アプリに表示されているものと同じ内容です。研究内容を最優先に選定し、判定（得点の目安）は参考値です。</p>
+        </div>}
+    </div>
+  );
 }
 
 Object.assign(window, { StudentDetailScreen });

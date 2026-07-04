@@ -13,6 +13,7 @@ function parseHash() {
   const path = h.split('?')[0];
   const parts = path.split('/').filter(Boolean);
   if (parts[0] === 'student' && parts[1]) return { name: 'student', param: decodeURIComponent(parts[1]) };
+  if (parts[0] === 'shibou' && parts[1]) return { name: 'shibou', param: decodeURIComponent(parts[1]) };
   return { name: 'students', param: null };
 }
 function useHashRoute() {
@@ -215,6 +216,7 @@ function App() {
   const nav = (name, param) => {
     if (name === 'back') { window.location.hash = '#/students'; return; }
     if (name === 'student') { window.location.hash = `#/student/${encodeURIComponent(param)}`; return; }
+    if (name === 'shibou') { window.location.hash = `#/shibou/${encodeURIComponent(param)}`; return; }
     if (name === 'students') { window.location.hash = '#/students'; return; }
   };
   const onRefresh = () => { freshRef.current = true; GVApi.clearCache(); setRefreshKey((k) => k + 1); };
@@ -239,7 +241,9 @@ function App() {
     <div className="gv-root tw-root dens-regular" data-device="desktop">
       <Header query={query} setQuery={setQuery} onRefresh={onRefresh} onHome={() => nav('students')} />
       <div className="tw-frame">
-        {route.name === 'student'
+        {route.name === 'shibou'
+          ? <ShibouScreen key={'shibou:' + route.param + ':' + refreshKey} nav={nav} name={route.param} />
+          : route.name === 'student'
           ? (detReady
               ? <StudentDetailScreen key={route.param + ':' + refreshKey} nav={nav} name={route.param} state="normal" />
               : <DetailStateView nav={nav} name={route.param} state={detState === 'normal' ? 'loading' : detState} />)

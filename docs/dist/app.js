@@ -6,6 +6,10 @@ function parseHash() {
     name: 'student',
     param: decodeURIComponent(parts[1])
   };
+  if (parts[0] === 'shibou' && parts[1]) return {
+    name: 'shibou',
+    param: decodeURIComponent(parts[1])
+  };
   return {
     name: 'students',
     param: null
@@ -48,25 +52,25 @@ function Header({
     className: "tw-brand-role"
   }, React.createElement("span", {
     className: "pill"
-  }, "Teacher"), "\u6210\u7E3E\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9"), React.createElement("div", {
+  }, "Teacher"), "成績ダッシュボード"), React.createElement("div", {
     className: "tw-header-spacer"
   }), React.createElement("div", {
     className: "tw-search"
   }, Icon.search(16), React.createElement("input", {
     value: query,
-    placeholder: "\u751F\u5F92\u540D\u3067\u691C\u7D22",
+    placeholder: "生徒名で検索",
     onChange: e => setQuery(e.target.value)
   }), query && React.createElement("button", {
     className: "clr",
     onClick: () => setQuery(''),
-    "aria-label": "\u30AF\u30EA\u30A2"
-  }, "\u2715")), React.createElement("button", {
+    "aria-label": "クリア"
+  }, "✕")), React.createElement("button", {
     className: `tw-icon-btn ${spinning ? 'spin' : ''}`,
     onClick: refresh,
-    title: "\u6700\u65B0\u30C7\u30FC\u30BF\u306B\u66F4\u65B0"
+    title: "最新データに更新"
   }, Icon.refresh(16), React.createElement("span", {
     className: "tw-refresh-lbl"
-  }, "\u66F4\u65B0")));
+  }, "更新")));
 }
 function AuthScreen({
   variant,
@@ -97,25 +101,25 @@ function AuthScreen({
     onSubmit: submit
   }, React.createElement("label", {
     className: "tw-auth-label"
-  }, "\u30D1\u30B9\u30EF\u30FC\u30C9"), React.createElement("input", {
+  }, "パスワード"), React.createElement("input", {
     className: "tw-auth-input",
     type: "password",
     value: token,
     onChange: e => setToken(e.target.value),
-    placeholder: "\u30D1\u30B9\u30EF\u30FC\u30C9\u3092\u5165\u529B",
+    placeholder: "パスワードを入力",
     autoComplete: "current-password",
     autoFocus: true
   }), err && React.createElement("div", {
     className: "tw-auth-err"
-  }, Icon.alert(14), React.createElement("span", null, "\u30D1\u30B9\u30EF\u30FC\u30C9\u304C\u4E00\u81F4\u3057\u307E\u305B\u3093\u3067\u3057\u305F\u3002")), React.createElement("button", {
+  }, Icon.alert(14), React.createElement("span", null, "パスワードが一致しませんでした。")), React.createElement("button", {
     className: "btn btn-primary btn-full",
     type: "submit",
     style: {
       marginTop: 16
     }
-  }, "\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u3092\u958B\u304F")), React.createElement("div", {
+  }, "ダッシュボードを開く")), React.createElement("div", {
     className: "tw-auth-note"
-  }, Icon.info(15), React.createElement("span", null, "\u30D1\u30B9\u30EF\u30FC\u30C9\u306F\u30BF\u30D6\u3092\u9589\u3058\u308B\u3068\u7834\u68C4\u3055\u308C\u307E\u3059\u3002\u30A2\u30AF\u30BB\u30B9\u3067\u304D\u306A\u3044\u5834\u5408\u306F\u7BA1\u7406\u8005\u306B\u3054\u9023\u7D61\u304F\u3060\u3055\u3044\u3002"))));
+  }, Icon.info(15), React.createElement("span", null, "パスワードはタブを閉じると破棄されます。アクセスできない場合は管理者にご連絡ください。"))));
 }
 function SetupScreen() {
   return React.createElement("div", {
@@ -130,9 +134,9 @@ function SetupScreen() {
     className: "tw-auth-ic err"
   }, Icon.alert(24)), React.createElement("div", {
     className: "tw-auth-t1"
-  }, "\u30BB\u30C3\u30C8\u30A2\u30C3\u30D7\u304C\u672A\u5B8C\u4E86\u3067\u3059"), React.createElement("div", {
+  }, "セットアップが未完了です"), React.createElement("div", {
     className: "tw-auth-t2"
-  }, React.createElement("code", null, "web/config.js"), " \u306E ", React.createElement("b", null, "GAS_ENDPOINT"), " \u306B\u3001GAS \u30A6\u30A7\u30D6\u30A2\u30D7\u30EA\u306E", React.createElement("code", null, "/exec"), " URL \u3092\u8A2D\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002")));
+  }, React.createElement("code", null, "web/config.js"), " の ", React.createElement("b", null, "GAS_ENDPOINT"), " に、GAS ウェブアプリの", React.createElement("code", null, "/exec"), " URL を設定してください。")));
 }
 function DetailStateView({
   nav,
@@ -144,7 +148,7 @@ function DetailStateView({
   }, React.createElement("button", {
     className: "tw-back",
     onClick: () => nav('back')
-  }, Icon.chevL(14), " \u4E00\u89A7\u3078\u623B\u308B"), React.createElement("h1", {
+  }, Icon.chevL(14), " 一覧へ戻る"), React.createElement("h1", {
     className: "tw-detail-title",
     style: {
       marginBottom: 18
@@ -166,18 +170,18 @@ function DetailStateView({
     className: "tw-loadwrap"
   }, React.createElement("div", {
     className: "spinner"
-  }), React.createElement("span", null, "\u6210\u7E3E\u30C7\u30FC\u30BF\u3092\u8AAD\u307F\u8FBC\u307F\u4E2D\u2026"))), state === 'empty' && React.createElement("div", {
+  }), React.createElement("span", null, "成績データを読み込み中…"))), state === 'empty' && React.createElement("div", {
     className: "tw-empty"
   }, React.createElement("div", {
     className: "tw-empty-ic"
   }, Icon.chart(26)), React.createElement("div", {
     className: "tw-empty-t1"
-  }, "\u307E\u3060\u6210\u7E3E\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093"), React.createElement("div", {
+  }, "まだ成績データがありません"), React.createElement("div", {
     className: "tw-empty-t2"
-  }, "\u3053\u306E\u751F\u5F92\u306E\u70B9\u6570\u5831\u544A\u304C\u767B\u9332\u3055\u308C\u308B\u3068\u3001\u3053\u3053\u306B\u63A8\u79FB\u304C\u8868\u793A\u3055\u308C\u307E\u3059\u3002"), React.createElement("button", {
+  }, "この生徒の点数報告が登録されると、ここに推移が表示されます。"), React.createElement("button", {
     className: "btn btn-primary btn-sm",
     onClick: () => nav('back')
-  }, "\u4E00\u89A7\u3078\u623B\u308B")), state === 'error' && React.createElement("div", {
+  }, "一覧へ戻る")), state === 'error' && React.createElement("div", {
     className: "tw-empty"
   }, React.createElement("div", {
     className: "tw-empty-ic",
@@ -187,9 +191,9 @@ function DetailStateView({
     }
   }, Icon.alert(26)), React.createElement("div", {
     className: "tw-empty-t1"
-  }, "\u30C7\u30FC\u30BF\u3092\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F"), React.createElement("div", {
+  }, "データを取得できませんでした"), React.createElement("div", {
     className: "tw-empty-t2"
-  }, "\u901A\u4FE1\u74B0\u5883\u3092\u78BA\u8A8D\u3057\u3066\u3001\u753B\u9762\u53F3\u4E0A\u306E\u300C\u66F4\u65B0\u300D\u304B\u3089\u3082\u3046\u4E00\u5EA6\u304A\u8A66\u3057\u304F\u3060\u3055\u3044\u3002")));
+  }, "通信環境を確認して、画面右上の「更新」からもう一度お試しください。")));
 }
 function App() {
   const route = useHashRoute();
@@ -299,6 +303,10 @@ function App() {
       window.location.hash = `#/student/${encodeURIComponent(param)}`;
       return;
     }
+    if (name === 'shibou') {
+      window.location.hash = `#/shibou/${encodeURIComponent(param)}`;
+      return;
+    }
     if (name === 'students') {
       window.location.hash = '#/students';
       return;
@@ -342,7 +350,11 @@ function App() {
     onHome: () => nav('students')
   }), React.createElement("div", {
     className: "tw-frame"
-  }, route.name === 'student' ? detReady ? React.createElement(StudentDetailScreen, {
+  }, route.name === 'shibou' ? React.createElement(ShibouScreen, {
+    key: 'shibou:' + route.param + ':' + refreshKey,
+    nav: nav,
+    name: route.param
+  }) : route.name === 'student' ? detReady ? React.createElement(StudentDetailScreen, {
     key: route.param + ':' + refreshKey,
     nav: nav,
     name: route.param,
