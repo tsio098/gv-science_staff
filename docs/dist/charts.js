@@ -151,7 +151,7 @@ function TotalTrendChart({
     height: H,
     viewBox: `0 0 ${W} ${H}`,
     role: "img",
-    "aria-label": "\u5408\u8A08\u70B9\u306E\u63A8\u79FB\u30B0\u30E9\u30D5"
+    "aria-label": "合計点の推移グラフ"
   }, sT.map((t, i) => React.createElement("g", {
     key: `g${i}`
   }, React.createElement("line", {
@@ -277,7 +277,7 @@ function FieldLineChart({
     height: H,
     viewBox: `0 0 ${W} ${H}`,
     role: "img",
-    "aria-label": "\u5206\u91CE\u5225\u306E\u63A8\u79FB\u30B0\u30E9\u30D5"
+    "aria-label": "分野別の推移グラフ"
   }, yT.map((t, i) => React.createElement("g", {
     key: `g${i}`
   }, React.createElement("line", {
@@ -307,7 +307,7 @@ function FieldLineChart({
     style: {
       fontSize: 12
     }
-  }, "\u5206\u91CE\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044"), series.length > 0 && K === 0 && React.createElement("text", {
+  }, "分野を選択してください"), series.length > 0 && K === 0 && React.createElement("text", {
     x: W / 2,
     y: H / 2,
     textAnchor: "middle",
@@ -315,7 +315,7 @@ function FieldLineChart({
     style: {
       fontSize: 12
     }
-  }, "\u3053\u306E\u6307\u6A19\u306E\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093"), series.map(s => {
+  }, "この指標のデータがありません"), series.map(s => {
     const pts = activeIdx.map((i, p) => s.values[i] != null ? {
       p,
       v: s.values[i]
@@ -342,7 +342,7 @@ function FieldLineChart({
     })));
   })), series.length > 0 && hasGaps && React.createElement("div", {
     className: "gt-gapnote"
-  }, Icon && Icon.info ? Icon.info(13) : null, React.createElement("span", null, "\u6B20\u6E2C\u6708\u306F\u8EF8\u304B\u3089\u5916\u3057\u3066\u8A70\u3081\u3001\u5B58\u5728\u3059\u308B\u6708\u3060\u3051\u3092\u9023\u7D9A\u7DDA\u3067\u8868\u793A\u3057\u3066\u3044\u307E\u3059\uFF08\u88DC\u9593\u306A\u3057\uFF09\u3002")));
+  }, Icon && Icon.info ? Icon.info(13) : null, React.createElement("span", null, "欠測月は軸から外して詰め、存在する月だけを連続線で表示しています（補間なし）。")));
 }
 function FieldMultiChart({
   months,
@@ -388,7 +388,7 @@ function FieldMultiChart({
     height: H,
     viewBox: `0 0 ${W} ${H}`,
     role: "img",
-    "aria-label": "\u5206\u91CE\u5225\u306E\u63A8\u79FB\u30B0\u30E9\u30D5\uFF08\u5F97\u70B9\u7387\u30FB\u5E73\u5747\u5F97\u70B9\u7387\u30FB\u504F\u5DEE\u5024\uFF09"
+    "aria-label": "分野別の推移グラフ（得点率・平均得点率・偏差値）"
   }, pT.map((t, i) => React.createElement("g", {
     key: `g${i}`
   }, React.createElement("line", {
@@ -424,7 +424,7 @@ function FieldMultiChart({
     style: {
       fontSize: 12
     }
-  }, "\u5206\u91CE\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044"), fields.length > 0 && K === 0 && React.createElement("text", {
+  }, "分野を選択してください"), fields.length > 0 && K === 0 && React.createElement("text", {
     x: W / 2,
     y: H / 2,
     textAnchor: "middle",
@@ -432,7 +432,7 @@ function FieldMultiChart({
     style: {
       fontSize: 12
     }
-  }, "\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093"), fields.map(f => {
+  }, "データがありません"), fields.map(f => {
     const rate = lineFor(f.rate, Yp);
     const avg = lineFor(f.avgRate, Yp);
     const hen = lineFor(f.hensachi, Yh);
@@ -506,7 +506,7 @@ function ClassHistogram({
     height: H,
     viewBox: `0 0 ${W} ${H}`,
     role: "img",
-    "aria-label": "\u504F\u5DEE\u5024\u306E\u5206\u5E03"
+    "aria-label": "偏差値の分布"
   }, bins.map((c, i) => {
     const bh = iH * c / maxC;
     const x = padL + bw * i + 2.5;

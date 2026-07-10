@@ -87,6 +87,19 @@ function defaultFields(det, subject) {
 function swCount(subject) {
   return subject === 'chemistry' || subject === 'biology' ? 5 : 3;
 }
+function rankFields(d, key) {
+  return d.fields.map(f => {
+    const {
+      last,
+      prev
+    } = latestPair(d[key][f]);
+    return {
+      f,
+      v: last,
+      prev
+    };
+  }).filter(x => x.v != null).sort((a, b) => b.v - a.v);
+}
 function Delta2({
   v,
   unit
@@ -388,6 +401,198 @@ function MockExamCard({
     className: "gt-note gt-note-soft"
   }, "マーク模試(フォーム) シートの記録を新しい順に表示。「英数」は国語・理科・社会を含まない校内マーク模試です。志望校はフォーム I列の最新回答を採用しています。"));
 }
+const PRINT_RECENT_TESTS = 10;
+const PRINT_CHART_W = 400;
+function PrintSubjectBlock({
+  det,
+  subject
+}) {
+  const meta = SUBJECT_META[subject];
+  const d = det.data[subject];
+  const tt = d.totalTrend;
+  if (!tt.length) return null;
+  const latest = tt[tt.length - 1];
+  const prev = tt[tt.length - 2];
+  const delta = prev ? latest.total - prev.total : 0;
+  const recent = tt.slice(-PRINT_RECENT_TESTS).reverse();
+  const ranked = rankFields(d, 'hensachi');
+  const cnt = swCount(subject);
+  const strong = ranked.slice(0, cnt);
+  const weak = ranked.slice(-cnt).reverse().filter(w => !strong.some(s => s.f === w.f));
+  return React.createElement("section", {
+    className: "pr-subject"
+  }, React.createElement("div", {
+    className: "pr-subject-h"
+  }, React.createElement("span", {
+    className: "pr-subject-dot",
+    style: {
+      background: meta.color
+    }
+  }), React.createElement("span", {
+    className: "pr-subject-name"
+  }, meta.label), React.createElement("span", {
+    className: "pr-subject-en gv-en"
+  }, meta.en), React.createElement("span", {
+    className: "pr-subject-aux gv-en"
+  }, tt.length, " TESTS")), React.createElement("div", {
+    className: "pr-grid"
+  }, React.createElement("div", {
+    className: "gt-card"
+  }, React.createElement("div", {
+    className: "gt-card-head"
+  }, React.createElement("div", {
+    className: "gt-card-title"
+  }, "合計点の推移")), React.createElement("div", {
+    className: "gt-summary"
+  }, React.createElement("div", {
+    className: "gt-sum-main"
+  }, React.createElement("div", {
+    className: "gt-sum-k"
+  }, "直近"), React.createElement("div", {
+    className: "gt-sum-v"
+  }, React.createElement("span", {
+    className: "gv-num"
+  }, fmt1(latest.total)), React.createElement("span", {
+    className: "gt-sum-u"
+  }, "点")), prev && React.createElement("div", {
+    className: `gt-sum-delta ${delta >= 0 ? 'up' : 'down'}`
+  }, delta >= 0 ? '▲' : '▼', " ", React.createElement("span", {
+    className: "gv-num"
+  }, fmt1(Math.abs(delta))))), React.createElement("div", {
+    className: "gt-sum-sub"
+  }, React.createElement("div", {
+    className: "gt-sum-cell"
+  }, React.createElement("span", {
+    className: "k"
+  }, "平均"), React.createElement("span", {
+    className: "v gv-num"
+  }, fmt1(latest.avg))), React.createElement("div", {
+    className: "gt-sum-cell acc"
+  }, React.createElement("span", {
+    className: "k"
+  }, "偏差値"), React.createElement("span", {
+    className: "v gv-num"
+  }, fmt1(latest.hensachi))))), tt.length >= 2 && React.createElement(React.Fragment, null, React.createElement(TotalTrendChart, {
+    points: tt,
+    width: PRINT_CHART_W
+  }), React.createElement("div", {
+    className: "gt-legend"
+  }, React.createElement("span", {
+    className: "gt-leg"
+  }, React.createElement("span", {
+    className: "gt-leg-line main"
+  }), "合計点"), React.createElement("span", {
+    className: "gt-leg"
+  }, React.createElement("span", {
+    className: "gt-leg-line dash"
+  }), "平均点"), React.createElement("span", {
+    className: "gt-leg"
+  }, React.createElement("span", {
+    className: "gt-leg-line acc"
+  }), "偏差値 ", React.createElement("span", {
+    className: "gv-en",
+    style: {
+      opacity: .6
+    }
+  }, "(右軸)"))))), React.createElement("div", {
+    className: "gt-card"
+  }, React.createElement("div", {
+    className: "gt-card-head"
+  }, React.createElement("div", {
+    className: "gt-card-title"
+  }, "テストごとの記録"), React.createElement("div", {
+    className: "gt-card-aux gv-num"
+  }, "直近", recent.length, "件 / 全", tt.length, "件")), React.createElement("div", {
+    className: "pr-tests"
+  }, recent.map((p, i) => React.createElement("div", {
+    key: i,
+    className: "gt-test-row"
+  }, React.createElement("span", {
+    className: "gt-test-date gv-num"
+  }, p.date.slice(5)), React.createElement("span", {
+    className: "gt-test-name"
+  }, p.test), React.createElement("span", {
+    className: "gt-test-score gv-num"
+  }, fmt1(p.total), React.createElement("small", null, "点")), React.createElement("span", {
+    className: "gt-test-hen gv-num"
+  }, "偏 ", fmt1(p.hensachi)))))), React.createElement("div", {
+    className: "gt-card"
+  }, React.createElement("div", {
+    className: "gt-card-head"
+  }, React.createElement("div", {
+    className: "gt-card-title"
+  }, "分野別の得点傾向", React.createElement("span", {
+    className: "gt-card-title-sub"
+  }, "直近の偏差値")), React.createElement("div", {
+    className: "gt-card-aux gv-en"
+  }, d.fields.length, " 分野")), React.createElement("div", {
+    className: "gt-sw"
+  }, React.createElement("div", {
+    className: "gt-sw-col"
+  }, React.createElement("div", {
+    className: "gt-sw-h"
+  }, React.createElement("span", {
+    className: "gt-sw-badge strong"
+  }, "得意"), "偏差値 上位", cnt), strong.map(({
+    f,
+    v,
+    prev: pv
+  }) => React.createElement("div", {
+    key: f,
+    className: "gt-sw-row"
+  }, React.createElement("span", {
+    className: "gt-sw-bar",
+    style: {
+      background: 'var(--c-primary)',
+      width: `${Math.max(8, Math.min(100, v))}%`
+    }
+  }), React.createElement("span", {
+    className: "gt-sw-name"
+  }, f), React.createElement("span", {
+    className: "gt-sw-v gv-num"
+  }, fmt1(v)), React.createElement(Delta2, {
+    v: pv != null ? v - pv : null
+  })))), React.createElement("div", {
+    className: "gt-sw-col"
+  }, React.createElement("div", {
+    className: "gt-sw-h"
+  }, React.createElement("span", {
+    className: "gt-sw-badge weak"
+  }, "苦手"), "偏差値 下位", cnt), weak.map(({
+    f,
+    v,
+    prev: pv
+  }) => React.createElement("div", {
+    key: f,
+    className: "gt-sw-row"
+  }, React.createElement("span", {
+    className: "gt-sw-bar",
+    style: {
+      background: 'var(--c-accent)',
+      width: `${Math.max(8, Math.min(100, v))}%`
+    }
+  }), React.createElement("span", {
+    className: "gt-sw-name"
+  }, f), React.createElement("span", {
+    className: "gt-sw-v gv-num"
+  }, fmt1(v)), React.createElement(Delta2, {
+    v: pv != null ? v - pv : null
+  }))))), React.createElement("div", {
+    className: "pr-foot"
+  }, "※ 分野別は「直近に値がある月」の偏差値（月次平均ベース）で判定。"))));
+}
+function PrintReport({
+  det
+}) {
+  return React.createElement("div", {
+    className: "gv-print-report",
+    "aria-hidden": "true"
+  }, det.subjects.map(s => React.createElement(PrintSubjectBlock, {
+    key: s,
+    det: det,
+    subject: s
+  })));
+}
 function StudentDetailScreen({
   nav,
   name,
@@ -430,8 +635,6 @@ function StudentDetailScreen({
     return n;
   });
   const onPrintPDF = () => {
-    setFv('strengths');
-    setMetric('rate');
     let st = document.getElementById('gv-print-page');
     if (!st) {
       st = document.createElement('style');
@@ -439,21 +642,11 @@ function StudentDetailScreen({
       document.head.appendChild(st);
     }
     st.textContent = '@page { size: B4 landscape; margin: 7mm; }';
-    setTimeout(() => window.print(), 220);
+    window.print();
   };
   const swMetricKey = metric === 'avgRate' ? 'rate' : metric;
   const swMetric = METRICS.find(m => m.key === swMetricKey);
-  const ranked = d.fields.map(f => {
-    const {
-      last,
-      prev
-    } = latestPair(d[swMetricKey][f]);
-    return {
-      f,
-      v: last,
-      prev
-    };
-  }).filter(x => x.v != null).sort((a, b) => b.v - a.v);
+  const ranked = rankFields(d, swMetricKey);
   const cnt = swCount(subject);
   const strong = ranked.slice(0, cnt);
   const weak = ranked.slice(-cnt).reverse().filter(w => !strong.some(s => s.f === w.f));
@@ -556,6 +749,8 @@ function StudentDetailScreen({
   }, meta.en), React.createElement(AttMini, {
     det: det
   }))), React.createElement(MockExamCard, {
+    det: det
+  }), React.createElement(PrintReport, {
     det: det
   }), React.createElement("div", {
     className: "tw-subject-section"

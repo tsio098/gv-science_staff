@@ -86,6 +86,14 @@ function swCount(subject) {
   return subject === 'chemistry' || subject === 'biology' ? 5 : 3;
 }
 
+// 指標 key ('rate' | 'hensachi') の「直近の値がある月」で分野をランク付け（降順）
+function rankFields(d, key) {
+  return d.fields.
+  map((f) => {const { last, prev } = latestPair(d[key][f]);return { f, v: last, prev };}).
+  filter((x) => x.v != null).
+  sort((a, b) => b.v - a.v);
+}
+
 function Delta2({ v, unit }) {
   if (v == null) return <span className="gt-sw-d flat gv-num">–</span>;
   const dv = Math.round(v * 10) / 10;
@@ -255,6 +263,134 @@ function MockExamCard({ det }) {
 
 }
 
+/* ============================================================================
+ *  印刷専用レポート（PDF出力・B4横）
+ *  画面では .gv-print-report を display:none にし、@media print でのみ表示する。
+ *  全履修科目を同一レイアウトで縦に並べる：
+ *    [合計点サマリー＋推移グラフ | テストごとの記録(直近N件) | 分野別の得点傾向(偏差値)]
+ *  ★ display:none 中は Measured の実測幅が 0 になるため、グラフは固定幅で直接描画
+ *    する（SVG は viewBox 持ちなので印刷時は列幅に合わせて自動縮尺される）。
+ * ========================================================================== */
+const PRINT_RECENT_TESTS = 10; // 印刷に載せる「テストごとの記録」の直近件数
+const PRINT_CHART_W = 400;     // 印刷グラフの基準幅(px)。B4横3カラムの左列相当。
+
+function PrintSubjectBlock({ det, subject }) {
+  const meta = SUBJECT_META[subject];
+  const d = det.data[subject];
+  const tt = d.totalTrend;
+  if (!tt.length) return null;
+  const latest = tt[tt.length - 1];
+  const prev = tt[tt.length - 2];
+  const delta = prev ? latest.total - prev.total : 0;
+  const recent = tt.slice(-PRINT_RECENT_TESTS).reverse(); // 新しい順
+
+  // 分野別は偏差値ベースで得意/苦手を判定（画面の指標選択とは独立）
+  const ranked = rankFields(d, 'hensachi');
+  const cnt = swCount(subject);
+  const strong = ranked.slice(0, cnt);
+  const weak = ranked.slice(-cnt).reverse().filter((w) => !strong.some((s) => s.f === w.f));
+
+  return (
+    <section className="pr-subject">
+      <div className="pr-subject-h">
+        <span className="pr-subject-dot" style={{ background: meta.color }} />
+        <span className="pr-subject-name">{meta.label}</span>
+        <span className="pr-subject-en gv-en">{meta.en}</span>
+        <span className="pr-subject-aux gv-en">{tt.length} TESTS</span>
+      </div>
+      <div className="pr-grid">
+
+        {/* ── 合計点の推移 ── */}
+        <div className="gt-card">
+          <div className="gt-card-head"><div className="gt-card-title">合計点の推移</div></div>
+          <div className="gt-summary">
+            <div className="gt-sum-main">
+              <div className="gt-sum-k">直近</div>
+              <div className="gt-sum-v"><span className="gv-num">{fmt1(latest.total)}</span><span className="gt-sum-u">点</span></div>
+              {prev &&
+              <div className={`gt-sum-delta ${delta >= 0 ? 'up' : 'down'}`}>{delta >= 0 ? '▲' : '▼'} <span className="gv-num">{fmt1(Math.abs(delta))}</span></div>
+              }
+            </div>
+            <div className="gt-sum-sub">
+              <div className="gt-sum-cell"><span className="k">平均</span><span className="v gv-num">{fmt1(latest.avg)}</span></div>
+              <div className="gt-sum-cell acc"><span className="k">偏差値</span><span className="v gv-num">{fmt1(latest.hensachi)}</span></div>
+            </div>
+          </div>
+          {tt.length >= 2 &&
+          <>
+            <TotalTrendChart points={tt} width={PRINT_CHART_W} />
+            <div className="gt-legend">
+              <span className="gt-leg"><span className="gt-leg-line main" />合計点</span>
+              <span className="gt-leg"><span className="gt-leg-line dash" />平均点</span>
+              <span className="gt-leg"><span className="gt-leg-line acc" />偏差値 <span className="gv-en" style={{ opacity: .6 }}>(右軸)</span></span>
+            </div>
+          </>
+          }
+        </div>
+
+        {/* ── テストごとの記録（直近N件・新しい順）── */}
+        <div className="gt-card">
+          <div className="gt-card-head">
+            <div className="gt-card-title">テストごとの記録</div>
+            <div className="gt-card-aux gv-num">直近{recent.length}件 / 全{tt.length}件</div>
+          </div>
+          <div className="pr-tests">
+            {recent.map((p, i) =>
+            <div key={i} className="gt-test-row">
+                <span className="gt-test-date gv-num">{p.date.slice(5)}</span>
+                <span className="gt-test-name">{p.test}</span>
+                <span className="gt-test-score gv-num">{fmt1(p.total)}<small>点</small></span>
+                <span className="gt-test-hen gv-num">偏 {fmt1(p.hensachi)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── 分野別の得点傾向（偏差値）── */}
+        <div className="gt-card">
+          <div className="gt-card-head">
+            <div className="gt-card-title">分野別の得点傾向<span className="gt-card-title-sub">直近の偏差値</span></div>
+            <div className="gt-card-aux gv-en">{d.fields.length} 分野</div>
+          </div>
+          <div className="gt-sw">
+            <div className="gt-sw-col">
+              <div className="gt-sw-h"><span className="gt-sw-badge strong">得意</span>偏差値 上位{cnt}</div>
+              {strong.map(({ f, v, prev: pv }) =>
+              <div key={f} className="gt-sw-row">
+                  <span className="gt-sw-bar" style={{ background: 'var(--c-primary)', width: `${Math.max(8, Math.min(100, v))}%` }} />
+                  <span className="gt-sw-name">{f}</span>
+                  <span className="gt-sw-v gv-num">{fmt1(v)}</span>
+                  <Delta2 v={pv != null ? v - pv : null} />
+                </div>
+              )}
+            </div>
+            <div className="gt-sw-col">
+              <div className="gt-sw-h"><span className="gt-sw-badge weak">苦手</span>偏差値 下位{cnt}</div>
+              {weak.map(({ f, v, prev: pv }) =>
+              <div key={f} className="gt-sw-row">
+                  <span className="gt-sw-bar" style={{ background: 'var(--c-accent)', width: `${Math.max(8, Math.min(100, v))}%` }} />
+                  <span className="gt-sw-name">{f}</span>
+                  <span className="gt-sw-v gv-num">{fmt1(v)}</span>
+                  <Delta2 v={pv != null ? v - pv : null} />
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="pr-foot">※ 分野別は「直近に値がある月」の偏差値（月次平均ベース）で判定。</div>
+        </div>
+      </div>
+    </section>);
+
+}
+
+function PrintReport({ det }) {
+  return (
+    <div className="gv-print-report" aria-hidden="true">
+      {det.subjects.map((s) => <PrintSubjectBlock key={s} det={det} subject={s} />)}
+    </div>);
+
+}
+
 function StudentDetailScreen({ nav, name, state = 'normal' }) {
   const det = DETAIL[name];
   const subjects = det ? det.subjects : [];
@@ -286,23 +422,19 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
   const fieldSeries = order.map((f) => ({ name: f, color: colorForField(det, subject, f), rate: d.rate[f], avgRate: d.avgRate[f], hensachi: d.hensachi[f] }));
   const toggleField = (f) => setSel((s) => {const n = new Set(s);n.has(f) ? n.delete(f) : n.add(f);return n;});
 
-  // PDF出力（B4 横）。分野別は「得点傾向（得点率）」表示に切り替えてから印刷する。
+  // PDF出力（B4 横）。印刷内容は印刷専用レポート(.gv-print-report＝全履修科目・
+  // 分野別は偏差値ベース)なので、画面の表示状態（科目タブ・指標・表示切替）に依存しない。
   const onPrintPDF = () => {
-    setFv('strengths');
-    setMetric('rate');
     let st = document.getElementById('gv-print-page');
     if (!st) { st = document.createElement('style'); st.id = 'gv-print-page'; document.head.appendChild(st); }
     st.textContent = '@page { size: B4 landscape; margin: 7mm; }';
-    setTimeout(() => window.print(), 220);
+    window.print();
   };
 
   // ── 得点傾向（得意/苦手）— 平均得点率は除外 ──
   const swMetricKey = metric === 'avgRate' ? 'rate' : metric;
   const swMetric = METRICS.find((m) => m.key === swMetricKey);
-  const ranked = d.fields.
-  map((f) => {const { last, prev } = latestPair(d[swMetricKey][f]);return { f, v: last, prev };}).
-  filter((x) => x.v != null).
-  sort((a, b) => b.v - a.v);
+  const ranked = rankFields(d, swMetricKey);
   const cnt = swCount(subject);
   const strong = ranked.slice(0, cnt);
   const weak = ranked.slice(-cnt).reverse().filter((w) => !strong.some((s) => s.f === w.f));
@@ -370,6 +502,9 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
       </div>
 
       <MockExamCard det={det} />
+
+      {/* 印刷専用（画面では非表示）：全履修科目を同一レイアウトで並べる */}
+      <PrintReport det={det} />
 
       {/* 科目別の成績推移セクション（科目タブ＋合計点/分野別カードを1グループとして見せる）*/}
       <div className="tw-subject-section">

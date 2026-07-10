@@ -29,15 +29,15 @@ function SubjStat({
     className: "tw-sstat-mid"
   }, React.createElement("span", {
     className: "tw-sstat-hen gv-num"
-  }, React.createElement("small", null, "\u504F"), s.lastHensachi), React.createElement(Delta, {
+  }, React.createElement("small", null, "偏"), s.lastHensachi), React.createElement(Delta, {
     v: s.deltaHensachi
   })), React.createElement("div", {
     className: "tw-sstat-bot"
-  }, "\u76F4\u8FD1 ", React.createElement("b", null, s.lastTotal), "\u70B9"), s.absence != null && React.createElement("div", {
+  }, "直近 ", React.createElement("b", null, s.lastTotal), "点"), s.absence != null && React.createElement("div", {
     className: `tw-sstat-abs ${absLevel(s.absence)}`
   }, React.createElement("span", {
     className: "k"
-  }, "\u6B20\u5E2D\u7387"), React.createElement("b", {
+  }, "欠席率"), React.createElement("b", {
     className: "gv-num"
   }, absFmt(s.absence), React.createElement("small", null, "%"))));
 }
@@ -48,11 +48,11 @@ function FlagBadges({
     className: "tw-flag declining"
   }, React.createElement("span", {
     className: "fdot"
-  }), "\u8981\u6CE8\u76EE \xB7 \u4E0B\u964D"), flags.stale && React.createElement("span", {
+  }), "要注目 · 下降"), flags.stale && React.createElement("span", {
     className: "tw-flag stale"
   }, React.createElement("span", {
     className: "fdot"
-  }), "\u9577\u671F\u672A\u53D7\u9A13"));
+  }), "長期未受験"));
 }
 function Avatar({
   name
@@ -74,7 +74,7 @@ function NameMain({
     className: "tw-name-flags"
   }, React.createElement("span", {
     className: "tw-hr-chip"
-  }, "\u62C5\u4EFB ", st.homeroom), React.createElement(FlagBadges, {
+  }, "担任 ", st.homeroom), React.createElement(FlagBadges, {
     flags: st.flags
   })));
 }
@@ -150,9 +150,9 @@ function ClassOverview({
     }
   }), React.createElement("span", {
     className: "t1"
-  }, m.label, " \xB7 \u30AF\u30E9\u30B9\u4FEF\u77B0"), React.createElement("span", {
+  }, m.label, " · クラス俯瞰"), React.createElement("span", {
     className: "aux gv-num"
-  }, vals.length, " \u540D \xB7 \u76F4\u8FD1\u504F\u5DEE\u5024\u306E\u5206\u5E03")), React.createElement("div", {
+  }, vals.length, " 名 · 直近偏差値の分布")), React.createElement("div", {
     className: "tw-overview-grid"
   }, React.createElement(Measured, {
     h: 132
@@ -166,13 +166,13 @@ function ClassOverview({
     className: "tw-ostat"
   }, React.createElement("div", {
     className: "k"
-  }, "\u5E73\u5747\u504F\u5DEE\u5024"), React.createElement("div", {
+  }, "平均偏差値"), React.createElement("div", {
     className: "v acc gv-num"
   }, avg)), React.createElement("div", {
     className: "tw-ostat"
   }, React.createElement("div", {
     className: "k"
-  }, "\u6700\u9AD8 / \u6700\u4F4E"), React.createElement("div", {
+  }, "最高 / 最低"), React.createElement("div", {
     className: "v gv-num"
   }, max, React.createElement("span", {
     style: {
@@ -183,16 +183,16 @@ function ClassOverview({
     className: "tw-ostat"
   }, React.createElement("div", {
     className: "k"
-  }, "\u524D\u56DE\u6BD4 \u4E0A\u6607"), React.createElement("div", {
+  }, "前回比 上昇"), React.createElement("div", {
     className: "v gv-num"
   }, rising, React.createElement("span", {
     style: {
       fontSize: 14,
       color: 'var(--c-text-mute)'
     }
-  }, " \u540D")))), React.createElement("div", {
+  }, " 名")))), React.createElement("div", {
     className: "tw-overview-hint"
-  }, "\u30AA\u30EC\u30F3\u30B8\u306E\u5E2F\uFF1D\u30AF\u30E9\u30B9\u5E73\u5747\u504F\u5DEE\u5024\u306E\u4F4D\u7F6E\u3002\u500B\u5225\u306E\u63A8\u79FB\u306F\u751F\u5F92\u3092\u30AF\u30EA\u30C3\u30AF\u3057\u3066\u78BA\u8A8D\u3067\u304D\u307E\u3059\u3002"))));
+  }, "オレンジの帯＝クラス平均偏差値の位置。個別の推移は生徒をクリックして確認できます。"))));
 }
 function TableView({
   students,
@@ -204,7 +204,7 @@ function TableView({
     className: "tw-tablescroll"
   }, React.createElement("table", {
     className: "tw-table"
-  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "\u751F\u5F92"), React.createElement("th", null, "\u5C65\u4FEE\u79D1\u76EE"), React.createElement("th", null, "\u79D1\u76EE\u5225 \xB7 \u76F4\u8FD1\u504F\u5DEE\u5024 / \u524D\u56DE\u6BD4 / \u5408\u8A08\u70B9"), React.createElement("th", null, "\u6700\u7D42\u53D7\u9A13"), React.createElement("th", null))), React.createElement("tbody", null, students.map(st => {
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "生徒"), React.createElement("th", null, "履修科目"), React.createElement("th", null, "科目別 · 直近偏差値 / 前回比 / 合計点"), React.createElement("th", null, "最終受験"), React.createElement("th", null))), React.createElement("tbody", null, students.map(st => {
     const flagged = st.flags.declining || st.flags.stale;
     return React.createElement("tr", {
       key: st.name,
@@ -281,13 +281,13 @@ function CardView({
         style: {
           color: m.color
         }
-      }, React.createElement("small", null, "\u504F"), ss.lastHensachi), React.createElement(Delta, {
+      }, React.createElement("small", null, "偏"), ss.lastHensachi), React.createElement(Delta, {
         v: ss.deltaHensachi
       }), React.createElement("span", {
         className: "tot"
-      }, "\u76F4\u8FD1 ", React.createElement("b", null, ss.lastTotal), "\u70B9"), ss.absence != null && React.createElement("span", {
+      }, "直近 ", React.createElement("b", null, ss.lastTotal), "点"), ss.absence != null && React.createElement("span", {
         className: `tw-card-abs ${absLevel(ss.absence)}`
-      }, "\u6B20\u5E2D ", React.createElement("b", {
+      }, "欠席 ", React.createElement("b", {
         className: "gv-num"
       }, absFmt(ss.absence), React.createElement("small", null, "%")))), React.createElement("span", {
         className: "spark"
@@ -299,9 +299,9 @@ function CardView({
       className: "tw-card-foot"
     }, React.createElement("span", {
       className: "gv-num"
-    }, "\u6700\u7D42\u53D7\u9A13 ", dateMD(st.lastExamDate), " \xB7 ", daysAgoLabel(st.daysSince)), React.createElement("span", {
+    }, "最終受験 ", dateMD(st.lastExamDate), " · ", daysAgoLabel(st.daysSince)), React.createElement("span", {
       className: "open"
-    }, "\u63A8\u79FB\u3092\u898B\u308B ", Icon.chevR(12))));
+    }, "推移を見る ", Icon.chevR(12))));
   }));
 }
 function HybridView({
@@ -476,27 +476,27 @@ function StudentListScreen({
     className: "tw-pagehead"
   }, React.createElement("div", {
     className: "tw-eyebrow"
-  }, "REPORT \xB7 \u751F\u5F92\u4E00\u89A7"), React.createElement("div", {
+  }, "REPORT · 生徒一覧"), React.createElement("div", {
     className: "tw-pagehead-row"
   }, React.createElement("h1", {
     className: "tw-title"
-  }, "\u6210\u7E3E", React.createElement("span", {
+  }, "成績", React.createElement("span", {
     className: "accent"
-  }, "\u4E00\u89A7")), React.createElement("div", {
+  }, "一覧")), React.createElement("div", {
     className: "tw-subtitle gv-num"
-  }, STUDENTS.length, " \u540D\u3092\u62C5\u5F53", flaggedCount > 0 && React.createElement("span", null, " \xB7 ", React.createElement("span", {
+  }, STUDENTS.length, " 名を担当", flaggedCount > 0 && React.createElement("span", null, " · ", React.createElement("span", {
     style: {
       color: 'var(--c-accent)',
       fontWeight: 600
     }
-  }, flaggedCount, " \u540D \u8981\u6CE8\u76EE"))))), React.createElement("div", {
+  }, flaggedCount, " 名 要注目"))))), React.createElement("div", {
     className: "tw-toolbar"
   }, React.createElement("div", {
     className: "tw-filters"
   }, React.createElement("button", {
     className: `tw-fchip ${subjectFilter === 'all' ? 'on' : ''}`,
     onClick: () => setSubjectFilter('all')
-  }, "\u5168\u79D1\u76EE"), SUBJECT_ORDER.map(s => {
+  }, "全科目"), SUBJECT_ORDER.map(s => {
     const m = SUBJECT_META[s];
     const on = subjectFilter === s;
     return React.createElement("button", {
@@ -516,19 +516,19 @@ function StudentListScreen({
     className: "tw-toolbar-right"
   }, React.createElement("span", {
     className: "tw-count gv-num"
-  }, list.length, " \u4EF6\u8868\u793A"), React.createElement("div", {
+  }, list.length, " 件表示"), React.createElement("div", {
     className: "tw-sort"
-  }, React.createElement("span", null, "\u62C5\u4EFB"), React.createElement("select", {
+  }, React.createElement("span", null, "担任"), React.createElement("select", {
     value: homeroomFilter,
     onChange: e => setHomeroomFilter(e.target.value)
   }, React.createElement("option", {
     value: "all"
-  }, "\u5168\u62C5\u4EFB"), HOMEROOMS.map(h => React.createElement("option", {
+  }, "全担任"), HOMEROOMS.map(h => React.createElement("option", {
     key: h,
     value: h
-  }, h, " \u5148\u751F")))), React.createElement("div", {
+  }, h)))), React.createElement("div", {
     className: "tw-sort"
-  }, React.createElement("span", null, "\u4E26\u3079\u66FF\u3048"), React.createElement("select", {
+  }, React.createElement("span", null, "並べ替え"), React.createElement("select", {
     value: sort,
     onChange: e => setSort(e.target.value)
   }, SORTS.map(o => React.createElement("option", {
@@ -543,15 +543,15 @@ function StudentListScreen({
     className: "tw-loadwrap"
   }, React.createElement("div", {
     className: "spinner"
-  }), React.createElement("span", null, "\u751F\u5F92\u30C7\u30FC\u30BF\u3092\u8AAD\u307F\u8FBC\u307F\u4E2D\u2026"))), state === 'empty' && React.createElement("div", {
+  }), React.createElement("span", null, "生徒データを読み込み中…"))), state === 'empty' && React.createElement("div", {
     className: "tw-empty"
   }, React.createElement("div", {
     className: "tw-empty-ic"
   }, Icon.user(28)), React.createElement("div", {
     className: "tw-empty-t1"
-  }, "\u62C5\u5F53\u751F\u5F92\u304C\u307E\u3060\u3044\u307E\u305B\u3093"), React.createElement("div", {
+  }, "担当生徒がまだいません"), React.createElement("div", {
     className: "tw-empty-t2"
-  }, "\u751F\u5F92\u304C\u70B9\u6570\u5831\u544A\u3092\u59CB\u3081\u308B\u3068\u3001\u3053\u3053\u306B\u4E00\u89A7\u3067\u8868\u793A\u3055\u308C\u307E\u3059\u3002", React.createElement("br", null), "\u914D\u5E03\u30EA\u30F3\u30AF\u30FB\u30C8\u30FC\u30AF\u30F3\u306E\u72B6\u6CC1\u306F\u7BA1\u7406\u8005\u306B\u3054\u78BA\u8A8D\u304F\u3060\u3055\u3044\u3002")), state === 'error' && React.createElement("div", {
+  }, "生徒が点数報告を始めると、ここに一覧で表示されます。", React.createElement("br", null), "配布リンク・トークンの状況は管理者にご確認ください。")), state === 'error' && React.createElement("div", {
     className: "tw-empty"
   }, React.createElement("div", {
     className: "tw-empty-ic",
@@ -561,16 +561,16 @@ function StudentListScreen({
     }
   }, Icon.alert(26)), React.createElement("div", {
     className: "tw-empty-t1"
-  }, "\u30C7\u30FC\u30BF\u3092\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093\u3067\u3057\u305F"), React.createElement("div", {
+  }, "データを取得できませんでした"), React.createElement("div", {
     className: "tw-empty-t2"
-  }, "\u901A\u4FE1\u74B0\u5883\u3092\u78BA\u8A8D\u3057\u3066\u3001\u3082\u3046\u4E00\u5EA6\u304A\u8A66\u3057\u304F\u3060\u3055\u3044\u3002"), React.createElement("button", {
+  }, "通信環境を確認して、もう一度お試しください。"), React.createElement("button", {
     className: "btn btn-quiet btn-sm",
     onClick: () => {}
   }, Icon.refresh(16), React.createElement("span", {
     style: {
       marginLeft: 6
     }
-  }, "\u3082\u3046\u4E00\u5EA6\u8A66\u3059"))), state === 'normal' && (list.length === 0 ? React.createElement("div", {
+  }, "もう一度試す"))), state === 'normal' && (list.length === 0 ? React.createElement("div", {
     className: "tw-empty"
   }, React.createElement("div", {
     className: "tw-empty-ic",
@@ -580,9 +580,9 @@ function StudentListScreen({
     }
   }, Icon.search(26)), React.createElement("div", {
     className: "tw-empty-t1"
-  }, "\u8A72\u5F53\u3059\u308B\u751F\u5F92\u304C\u3044\u307E\u305B\u3093"), React.createElement("div", {
+  }, "該当する生徒がいません"), React.createElement("div", {
     className: "tw-empty-t2"
-  }, "\u691C\u7D22\u6761\u4EF6\u30FB\u79D1\u76EE\u30D5\u30A3\u30EB\u30BF\u3092\u5909\u3048\u3066\u304A\u8A66\u3057\u304F\u3060\u3055\u3044\u3002")) : React.createElement(React.Fragment, null, layout === 'table' && React.createElement(TableView, {
+  }, "検索条件・科目フィルタを変えてお試しください。")) : React.createElement(React.Fragment, null, layout === 'table' && React.createElement(TableView, {
     students: list,
     onOpen: n => nav('student', n)
   }), layout === 'cards' && React.createElement(CardView, {

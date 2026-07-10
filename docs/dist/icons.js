@@ -1,4 +1,3 @@
-function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
 const stroke = {
   fill: 'none',
   stroke: 'currentColor',
@@ -7,11 +6,12 @@ const stroke = {
   strokeLinejoin: 'round'
 };
 const Icon = {
-  flask: (s = 22) => React.createElement("svg", _extends({
+  flask: (s = 22) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("path", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("path", {
     d: "M9 3h6"
   }), React.createElement("path", {
     d: "M10 3v5l-4.5 9a2 2 0 0 0 1.8 3h9.4a2 2 0 0 0 1.8-3L14 8V3"
@@ -30,31 +30,34 @@ const Icon = {
     fill: "currentColor",
     stroke: "none"
   })),
-  leaf: (s = 22) => React.createElement("svg", _extends({
+  leaf: (s = 22) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("path", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("path", {
     d: "M5 19c0-9 6-15 15-15 0 9-6 15-15 15Z"
   }), React.createElement("path", {
     d: "M5 19 13 11"
   })),
-  earth: (s = 22) => React.createElement("svg", _extends({
+  earth: (s = 22) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("circle", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("circle", {
     cx: "12",
     cy: "12",
     r: "8.5"
   }), React.createElement("path", {
     d: "M3.5 12h17M12 3.5c2.5 3 2.5 14 0 17M12 3.5c-2.5 3-2.5 14 0 17"
   })),
-  calendar: (s = 22) => React.createElement("svg", _extends({
+  calendar: (s = 22) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("rect", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("rect", {
     x: "3.5",
     y: "5",
     width: "17",
@@ -63,66 +66,74 @@ const Icon = {
   }), React.createElement("path", {
     d: "M3.5 9.5h17M8 3v4M16 3v4"
   })),
-  pencil: (s = 22) => React.createElement("svg", _extends({
+  pencil: (s = 22) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("path", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("path", {
     d: "m4 20 1-4 11-11a2.121 2.121 0 0 1 3 3l-11 11-4 1Z"
   }), React.createElement("path", {
     d: "m14 7 3 3"
   })),
-  book: (s = 22) => React.createElement("svg", _extends({
+  book: (s = 22) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("path", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("path", {
     d: "M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15Z"
   }), React.createElement("path", {
     d: "M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5A2.5 2.5 0 0 1 4 20.5Z"
   })),
-  share: (s = 22) => React.createElement("svg", _extends({
+  share: (s = 22) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("path", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("path", {
     d: "m4 20 17-8L4 4l4 8-4 8Z"
   }), React.createElement("path", {
     d: "m8 12 13 0"
   })),
-  chart: (s = 22) => React.createElement("svg", _extends({
+  chart: (s = 22) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("path", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("path", {
     d: "M4 20V8M10 20V4M16 20v-7M22 20H2"
   })),
-  chevR: (s = 14) => React.createElement("svg", _extends({
+  chevR: (s = 14) => React.createElement("svg", {
     width: s * (8 / 14),
     height: s,
-    viewBox: "0 0 8 14"
-  }, stroke), React.createElement("path", {
+    viewBox: "0 0 8 14",
+    ...stroke
+  }, React.createElement("path", {
     d: "m1 1 6 6-6 6"
   })),
-  chevL: (s = 14) => React.createElement("svg", _extends({
+  chevL: (s = 14) => React.createElement("svg", {
     width: s * (8 / 14),
     height: s,
-    viewBox: "0 0 8 14"
-  }, stroke), React.createElement("path", {
+    viewBox: "0 0 8 14",
+    ...stroke
+  }, React.createElement("path", {
     d: "M7 1 1 7l6 6"
   })),
-  download: (s = 18) => React.createElement("svg", _extends({
+  download: (s = 18) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("path", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("path", {
     d: "M12 4v12M6 11l6 6 6-6M4 20h16"
   })),
-  play: (s = 18) => React.createElement("svg", _extends({
+  play: (s = 18) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("circle", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("circle", {
     cx: "12",
     cy: "12",
     r: "8.5"
@@ -131,45 +142,50 @@ const Icon = {
     fill: "currentColor",
     stroke: "none"
   })),
-  ext: (s = 14) => React.createElement("svg", _extends({
+  ext: (s = 14) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("path", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("path", {
     d: "M14 4h6v6M20 4 10 14M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"
   })),
-  search: (s = 16) => React.createElement("svg", _extends({
+  search: (s = 16) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("circle", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("circle", {
     cx: "11",
     cy: "11",
     r: "6.5"
   }), React.createElement("path", {
     d: "m20 20-4.3-4.3"
   })),
-  alert: (s = 22) => React.createElement("svg", _extends({
+  alert: (s = 22) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("path", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("path", {
     d: "M12 4 2.5 20h19L12 4Z"
   }), React.createElement("path", {
     d: "M12 10v4M12 17v0.5"
   })),
-  check: (s = 16) => React.createElement("svg", _extends({
+  check: (s = 16) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("path", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("path", {
     d: "m4 12 5 5 11-11"
   })),
-  user: (s = 20) => React.createElement("svg", _extends({
+  user: (s = 20) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("circle", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("circle", {
     cx: "12",
     cy: "8.5",
     r: "3.8"
@@ -210,31 +226,34 @@ const Icon = {
     d: "M14 14h3v3M21 14v0M17 21h4v-4M14 21h0",
     strokeLinecap: "round"
   })),
-  refresh: (s = 18) => React.createElement("svg", _extends({
+  refresh: (s = 18) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("path", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("path", {
     d: "M20 11a8 8 0 1 0-.7 3.7"
   }), React.createElement("path", {
     d: "M20 4v5h-5"
   })),
-  info: (s = 16) => React.createElement("svg", _extends({
+  info: (s = 16) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("circle", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("circle", {
     cx: "12",
     cy: "12",
     r: "8.5"
   }), React.createElement("path", {
     d: "M12 11v5M12 8v0.5"
   })),
-  trend: (s = 22) => React.createElement("svg", _extends({
+  trend: (s = 22) => React.createElement("svg", {
     width: s,
     height: s,
-    viewBox: "0 0 24 24"
-  }, stroke), React.createElement("path", {
+    viewBox: "0 0 24 24",
+    ...stroke
+  }, React.createElement("path", {
     d: "M4 4v15.5a.5.5 0 0 0 .5.5H20"
   }), React.createElement("path", {
     d: "m7.5 15 3.5-4 3 2.5L20 7"
