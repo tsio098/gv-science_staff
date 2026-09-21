@@ -149,6 +149,7 @@ function App() {
   const [detState, setDetState] = React.useState('loading');
   const [, force] = React.useReducer((x) => x + 1, 0);
   const freshRef = React.useRef(false);
+  const listScrollRef = React.useRef(0); // 一覧を離れる直前のスクロール位置（戻ったとき復元）
 
   const noConfig = !GVApi.ENDPOINT && !GVApi.SAMPLE;
 
@@ -213,7 +214,21 @@ function App() {
   // fresh フラグは1回の更新ぶんだけ有効（上記2effectが読んだ後にリセット）
   React.useEffect(() => { freshRef.current = false; }, [refreshKey]);
 
+  // スクロール制御：詳細/志望校へ移ったら先頭へ、一覧へ戻ったら離脱時の位置へ復元。
+  // listState を依存に含めるのは、戻った瞬間がまだ loading（表が短い）だと
+  // scrollTo が途中で頭打ちになるため、normal 到達時にもう一度復元するため。
+  React.useLayoutEffect(() => {
+    if (route.name === 'students') {
+      if (listState === 'normal') window.scrollTo(0, listScrollRef.current);
+    } else {
+      window.scrollTo(0, 0);
+    }
+  }, [route.name, listState]);
+
   const nav = (name, param) => {
+    if (route.name === 'students' && (name === 'student' || name === 'shibou')) {
+      listScrollRef.current = window.scrollY;
+    }
     if (name === 'back') { window.location.hash = '#/students'; return; }
     if (name === 'student') { window.location.hash = `#/student/${encodeURIComponent(param)}`; return; }
     if (name === 'shibou') { window.location.hash = `#/shibou/${encodeURIComponent(param)}`; return; }

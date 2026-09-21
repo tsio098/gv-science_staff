@@ -489,7 +489,8 @@ function StudentDetailScreen({ nav, name, state = 'normal' }) {
           <div className="tw-eyebrow">REPORT · 成績推移</div>
           <h1 className="tw-detail-title">{name}<span className="grade">{det.grade}</span></h1>
           <div className="tw-detail-meta">
-            <span className="tw-hr-chip">担任 {det.homeroom} 先生</span>
+            {/* homeroom はデータ側に「先生」を含むことがあるため、末尾の重複を除いて付け直す */}
+            <span className="tw-hr-chip">担任 {String(det.homeroom || '').replace(/\s*先生$/, '')}先生</span>
             {det.mock && det.mock.aspiration &&
             <span className="tw-asp-inline">{Icon.flag ? Icon.flag(13) : null}志望校 <b>{det.mock.aspiration}</b></span>
             }

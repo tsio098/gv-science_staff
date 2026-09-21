@@ -740,7 +740,7 @@ function StudentDetailScreen({
     className: "tw-detail-meta"
   }, React.createElement("span", {
     className: "tw-hr-chip"
-  }, "担任 ", det.homeroom, " 先生"), det.mock && det.mock.aspiration && React.createElement("span", {
+  }, "担任 ", String(det.homeroom || '').replace(/\s*先生$/, ''), "先生"), det.mock && det.mock.aspiration && React.createElement("span", {
     className: "tw-asp-inline"
   }, Icon.flag ? Icon.flag(13) : null, "志望校 ", React.createElement("b", null, det.mock.aspiration)))), React.createElement("div", {
     className: "tw-detail-right"

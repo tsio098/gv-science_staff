@@ -209,6 +209,7 @@ function App() {
   const [detState, setDetState] = React.useState('loading');
   const [, force] = React.useReducer(x => x + 1, 0);
   const freshRef = React.useRef(false);
+  const listScrollRef = React.useRef(0);
   const noConfig = !GVApi.ENDPOINT && !GVApi.SAMPLE;
   const onUnauthorized = () => {
     GVApi.clearToken();
@@ -294,7 +295,17 @@ function App() {
   React.useEffect(() => {
     freshRef.current = false;
   }, [refreshKey]);
+  React.useLayoutEffect(() => {
+    if (route.name === 'students') {
+      if (listState === 'normal') window.scrollTo(0, listScrollRef.current);
+    } else {
+      window.scrollTo(0, 0);
+    }
+  }, [route.name, listState]);
   const nav = (name, param) => {
+    if (route.name === 'students' && (name === 'student' || name === 'shibou')) {
+      listScrollRef.current = window.scrollY;
+    }
     if (name === 'back') {
       window.location.hash = '#/students';
       return;
