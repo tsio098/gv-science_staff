@@ -26,6 +26,20 @@ function useHashRoute() {
   return route;
 }
 
+// ── page scroll（実スクローラーは環境で変わる）──────────────
+// teacher.css の html,body{height:100%; overflow-x:hidden} により、縦スクロールは
+// window ではなく body 要素の内部スクロールになる（overflow-x:hidden 指定で
+// overflow-y が auto に計算されるため）。window.scrollY は常に 0 なので、
+// body / documentElement / window のどれがスクローラーでも動くよう全部を見る。
+function getPageScrollY() {
+  return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+}
+function setPageScrollY(y) {
+  window.scrollTo(0, y);
+  document.documentElement.scrollTop = y;
+  document.body.scrollTop = y;
+}
+
 // ── header ────────────────────────────────────────────────
 function Header({ query, setQuery, onRefresh, onHome }) {
   const [spinning, setSpinning] = React.useState(false);
@@ -219,15 +233,15 @@ function App() {
   // scrollTo が途中で頭打ちになるため、normal 到達時にもう一度復元するため。
   React.useLayoutEffect(() => {
     if (route.name === 'students') {
-      if (listState === 'normal') window.scrollTo(0, listScrollRef.current);
+      if (listState === 'normal') setPageScrollY(listScrollRef.current);
     } else {
-      window.scrollTo(0, 0);
+      setPageScrollY(0);
     }
   }, [route.name, listState]);
 
   const nav = (name, param) => {
     if (route.name === 'students' && (name === 'student' || name === 'shibou')) {
-      listScrollRef.current = window.scrollY;
+      listScrollRef.current = getPageScrollY();
     }
     if (name === 'back') { window.location.hash = '#/students'; return; }
     if (name === 'student') { window.location.hash = `#/student/${encodeURIComponent(param)}`; return; }

@@ -24,6 +24,14 @@ function useHashRoute() {
   }, []);
   return route;
 }
+function getPageScrollY() {
+  return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+}
+function setPageScrollY(y) {
+  window.scrollTo(0, y);
+  document.documentElement.scrollTop = y;
+  document.body.scrollTop = y;
+}
 function Header({
   query,
   setQuery,
@@ -297,14 +305,14 @@ function App() {
   }, [refreshKey]);
   React.useLayoutEffect(() => {
     if (route.name === 'students') {
-      if (listState === 'normal') window.scrollTo(0, listScrollRef.current);
+      if (listState === 'normal') setPageScrollY(listScrollRef.current);
     } else {
-      window.scrollTo(0, 0);
+      setPageScrollY(0);
     }
   }, [route.name, listState]);
   const nav = (name, param) => {
     if (route.name === 'students' && (name === 'student' || name === 'shibou')) {
-      listScrollRef.current = window.scrollY;
+      listScrollRef.current = getPageScrollY();
     }
     if (name === 'back') {
       window.location.hash = '#/students';
