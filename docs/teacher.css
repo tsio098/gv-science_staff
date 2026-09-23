@@ -4,7 +4,12 @@
    デスクトップ中心の Web アプリシェルを上乗せする。  ライト固定。
    ============================================================ */
 
-html, body { height: 100%; }
+/* ★ html/body に height:100% を与えない。
+   与えると「height固定 + overflow-x指定」の組み合わせで body 自体が
+   縦スクロールコンテナになり（overflow-y が auto に計算される）、
+   window.scrollY が常に 0 になる・実Safariでプログラムスクロール後に
+   クリック/タップのヒットテストがずれる等の不具合の温床になる。
+   縦スクロールは通常どおり window に任せる。 */
 body {
   margin: 0;
   font-family: var(--f-jp);
@@ -31,8 +36,11 @@ body {
 
 /* スマホ縦表示の崩れ対策：ページ全体が横にはみ出して横スクロールするのを防ぐ。
    個別の横スクロール領域（模試テーブル .mk-tablewrap / 一覧テーブル .tw-tablescroll）は
-   自前の overflow-x:auto を持つため、ここで止めても内部スクロールには影響しない。 */
-html, body { overflow-x: hidden; }
+   自前の overflow-x:auto を持つため、ここで止めても内部スクロールには影響しない。
+   ★body のみに指定する（htmlに付けない）。html の overflow が visible のとき
+   body の overflow はビューポートへ「移譲」され、body 自身はスクロールコンテナに
+   ならない＝縦スクロールが window のまま保たれ、sticky ヘッダーも正常に効く。 */
+body { overflow-x: hidden; }
 .tw-root, .tw-frame, .tw-main { max-width: 100%; }
 
 /* device-preview frame (Tweak) */
